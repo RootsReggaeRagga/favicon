@@ -56,6 +56,9 @@ FROM base AS builder
 # i wewnatrz kopiowanego katalogu, wiec przenosza sie miedzy stage'ami poprawnie.
 COPY --from=deps /srv/app/node_modules ./node_modules
 COPY app/ ./
+# public/ jest pusty (ikony aplikacji leza w app/app/), a git nie trzyma
+# pustych katalogow — w swiezym klonie go nie ma i COPY w runnerze by padl.
+RUN mkdir -p public
 # Build pobiera fonty Geist z Google Fonts (next/font osadza je w obrazie),
 # poza tym strona glowna jest prerenderowana, a /api/health dynamiczne.
 RUN pnpm run build

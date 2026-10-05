@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { Geist, Geist_Mono } from "next/font/google";
+import { connection } from "next/server";
 import BrewcodeBadge from "@/components/BrewcodeBadge";
+import { isGaId } from "@/lib/analytics";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,13 +27,20 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // GA_MEASUREMENT_ID czytamy w runtime, nie przy buildzie (jak NEXT_PUBLIC_*):
+  // zmiana albo wylaczenie GA to edycja .env i restart kontenera, bez
+  // przebudowy obrazu. `connection()` przenosi render na czas zadania —
+  // przy prerenderze zmienna zostalaby zamrozona w HTML-u z builda.
+  await connection();
+  const gaId = process.env.GA_MEASUREMENT_ID?.trim();
   return (
     <html lang="pl" className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
         {children}
         <BrewcodeBadge />
       </body>
+      {isGaId(gaId) && <GoogleAnalytics gaId={gaId} />}
     </html>
   );
 }

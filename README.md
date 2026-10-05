@@ -10,8 +10,9 @@ iOS / App Store, macOS i Windows razem z plikami konfiguracyjnymi i fragmentem
 Renderowanie (canvas), kodowanie PNG/ICO i pakowanie ZIP-a robi przeglądarka
 użytkownika, a ustawienia zapisują się w jej `localStorage`. Serwer tylko
 serwuje stronę i `/api/health`, więc aplikacja nie ma bazy, kluczy API ani
-sekretów. Plik `.env` w roocie zawiera wyłącznie nazwę projektu, port, domenę
-i ustawienia Traefika i dlatego jest w repozytorium.
+sekretów. Plik `.env` w roocie zawiera wyłącznie nazwę projektu, port, domenę,
+ustawienia Traefika i identyfikator Google Analytics (jawny — i tak widać go
+w źródle każdej strony), dlatego jest w repozytorium.
 
 Produkcyjnie: **https://favicon.brwcd.dev**
 
@@ -225,6 +226,33 @@ poniżej 0,1% pikseli, głównie na krawędziach cienia).
 
 Stos: Next.js 16 (App Router, `output: "standalone"`), React 19, Tailwind 4,
 shadcn/ui na Radix, lucide-react, JSZip, Vitest. Menedżer pakietów: pnpm.
+
+## Google Analytics
+
+Opcjonalne. Identyfikator strumienia GA4 wpisujesz w `.env`:
+
+```bash
+GA_MEASUREMENT_ID=G-XXXXXXXXXX     # puste = GA wyłączone, skrypt się nie ładuje
+```
+
+Zmienna jest czytana **w runtime** (layout renderuje się na żądanie przez
+`connection()`), a nie wkompilowywana przy buildzie jak `NEXT_PUBLIC_*` — po
+zmianie wystarczy odtworzyć kontener (`docker compose up -d`), bez przebudowy
+obrazu. Wartość musi mieć format `G-…`, inaczej GA się nie włączy.
+
+Skrypt ładuje oficjalny komponent `GoogleAnalytics` z `@next/third-parties`.
+Poza odsłonami aplikacja wysyła zdarzenia pobierania (`lib/analytics.ts`):
+
+| Zdarzenie | Kiedy | Parametry |
+| --- | --- | --- |
+| `download_package` | pobranie paczki ZIP | `file_count`, `group_count`, `groups` (np. `android,favicon,ios`), `source_type`, `size_kb` |
+| `download_file` | kliknięcie kafelka — pojedynczy plik | `file_name` (ścieżka w paczce), `file_group`, `source_type` |
+| `download_project` | „Zapisz ustawienia” | `source_type` |
+
+`source_type` to `svg`, `png` (raster) albo `text` (litera / emoji). Żeby
+parametry były widoczne w raportach GA4, zarejestruj je w panelu jako
+wymiary niestandardowe (Administracja → Definicje niestandardowe), a liczby
+(`file_count`, `size_kb`) jako dane niestandardowe.
 
 ## Testy
 

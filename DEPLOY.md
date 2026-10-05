@@ -53,6 +53,10 @@ APP_DOMAIN=favicon.brwcd.dev      # domena obsługiwana przez Traefika
 # APP_MEM_LIMIT=256m
 ```
 
+- `GA_MEASUREMENT_ID` — identyfikator Google Analytics 4 (`G-…`). Puste
+  wyłącza GA. Czytany w runtime, więc zmiana nie wymaga przebudowy — tylko
+  odtworzenia kontenera (`docker compose -f docker-compose.prod.yml up -d`).
+  Szczegóły i lista zdarzeń w README, sekcja „Google Analytics”.
 - `APP_PORT` i `NODE_ENV=development` z `.env` dotyczą tylko stacku dev.
   W produkcji port nie jest publikowany, a `docker-compose.prod.yml` jawnie
   wymusza `NODE_ENV=production`.
@@ -100,9 +104,11 @@ błąd na tym etapie to błąd frontu (konsola przeglądarki), nie serwera.
 
 ## 4. Zależności zewnętrzne
 
-**W runtime — żadnych.** Aplikacja nie woła żadnego API, nie pobiera fontów
-z zewnątrz (`next/font` osadza Geist w obrazie przy buildzie), nie ma
-analityki. Działa też za zamkniętym egressem.
+**W runtime — żadnych po stronie serwera.** Aplikacja nie woła żadnego API,
+nie pobiera fontów z zewnątrz (`next/font` osadza Geist w obrazie przy buildzie)
+i działa też za zamkniętym egressem. Google Analytics (gdy ustawione
+`GA_MEASUREMENT_ID`) ładuje i wysyła **przeglądarka użytkownika** prosto do
+`googletagmanager.com` / `google-analytics.com` — serwer w tym nie pośredniczy.
 
 **Przy buildzie** kontener `deps` pobiera paczki z registry npm, a `next build`
 fonty z Google Fonts. Przed buildem stage `builder` uruchamia testy
@@ -218,6 +224,8 @@ etykiety `traefik.http.routers.favicon.middlewares` obok `favicon-security`.
   użytkownika jest czytany wyłącznie w jego przeglądarce.
 - Jedyna trasa serwerowa to `/api/health` — nie przyjmuje danych.
 - Proces w kontenerze działa jako `node` (uid 1000), nie root.
+- Identyfikator GA jest walidowany (`G-` + litery/cyfry), zanim trafi do skryptu
+  inline — błędna wartość w `.env` po prostu wyłącza GA.
 - Nagłówki HSTS, `nosniff`, `frameDeny` i `referrer-policy` ustawia middleware
   `favicon-security` zdefiniowany w `docker-compose.prod.yml`.
 

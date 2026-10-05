@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { track } from "@/lib/analytics";
 import { buildPackage, downloadBlob, exportTarget, PROJECT_FILE, projectFromJson, projectToJson } from "@/lib/package";
 import type { RenderOptions } from "@/lib/render";
 import { DEFAULT_SETTINGS, GROUPS, mergeSettings, SMALL_MAX, type Align, type BgMode, type GroupId, type Settings } from "@/lib/settings";
@@ -56,6 +57,9 @@ interface Stored {
 }
 
 type SourceTab = "file" | "text";
+
+/** Rodzaj zrodla do analityki: plik wektorowy, raster albo litera/emoji. */
+const sourceType = (src: IconSource | null) => (!src ? "none" : src.text ? "text" : src.kind);
 
 const HERO: RenderOptions = { mode: "shape" };
 const HERO_SIZE = 256;
@@ -161,6 +165,7 @@ function Tile({ target, src, s }: { target: Target; src: IconSource | null; s: S
         setBusy(true);
         try {
           downloadBlob(await exportTarget(target, src, s), name);
+          track("download_file", { file_name: target.path, file_group: target.group, source_type: sourceType(src) });
         } finally {
           setBusy(false);
         }
@@ -368,6 +373,13 @@ export default function Generator() {
     try {
       const blob = await buildPackage(groups, source, settings, (done, total) => setProgress(`${done}/${total}`));
       downloadBlob(blob, "icons.zip");
+      track("download_package", {
+        file_count: fileCount,
+        group_count: groups.size,
+        groups: [...groups].sort().join(","),
+        source_type: sourceType(source),
+        size_kb: Math.round(blob.size / 1024),
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -720,12 +732,13 @@ export default function Generator() {
                 size="sm"
                 variant="secondary"
                 className="flex-1"
-                onClick={() =>
+                onClick={() => {
                   downloadBlob(
                     new Blob([JSON.stringify(projectToJson(settings, groups, source), null, 2)], { type: "application/json" }),
                     PROJECT_FILE,
-                  )
-                }
+                  );
+                  track("download_project", { source_type: sourceType(source) });
+                }}
               >
                 <FileDown /> Zapisz ustawienia
               </Button>

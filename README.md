@@ -36,10 +36,11 @@ pnpm dev                        # http://localhost:3000
 
 > **Nowa zależność w `package.json`?** W kontenerze dev `node_modules` leży na
 > wolumenie nazwanym, który nie odświeża się sam przy przebudowie obrazu.
-> Doinstaluj w działającym kontenerze i zrestartuj go:
+> Doinstaluj w działającym kontenerze i zrestartuj go. `--store-dir` trzyma
+> cache pnpm poza bind mountem — inaczej ląduje w `app/.pnpm-store` na hoście.
 >
 > ```bash
-> docker compose exec -e CI=true app pnpm install --frozen-lockfile
+> docker compose exec -e CI=true app pnpm install --frozen-lockfile --store-dir /home/node/.pnpm-store
 > docker compose restart app
 > ```
 

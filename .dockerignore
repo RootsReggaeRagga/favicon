@@ -23,6 +23,7 @@ app/.agents
 
 # Artefakty aplikacji — instalowane i budowane na nowo w obrazie.
 app/node_modules
+app/.pnpm-store
 app/.next
 app/out
 app/coverage

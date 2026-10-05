@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/* Aplikacja ma tylko motyw ciemny — klasa .dark stoi na <html> na stale,
+   wariant zostaje dla zgodnosci z komponentami shadcn. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Palety jak w brewcode-pdf-tool (.dark), primary w kolorze marki z badge'a. */
+:root {
+  --radius: 0.625rem;
+  color-scheme: dark;
+  --background: oklch(0.185 0 0);
+  --foreground: oklch(0.97 0 0);
+  --card: oklch(0.228 0 0);
+  --card-foreground: oklch(0.97 0 0);
+  --popover: oklch(0.255 0 0);
+  --popover-foreground: oklch(0.97 0 0);
+  --primary: #f6b900;
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.305 0 0);
+  --secondary-foreground: oklch(0.97 0 0);
+  --muted: oklch(0.27 0 0);
+  --muted-foreground: oklch(0.715 0 0);
+  --accent: oklch(0.36 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.62 0.2 25);
+  --border: oklch(0.3 0 0);
+  --input: oklch(0.33 0 0);
+  --ring: oklch(0.6 0 0);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  label:has(input:not(:disabled), button:not(:disabled)),
+  label[for],
+  input[type="color"]:not(:disabled) {
+    cursor: pointer;
+  }
+  :is(button, input):disabled {
+    cursor: not-allowed;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--secondary);
+    border-radius: 999px;
+    border: 2px solid var(--background);
+  }
+}

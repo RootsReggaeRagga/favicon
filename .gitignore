@@ -1,0 +1,3 @@
+# Warstwa wdrozeniowa. Ignory aplikacji sa w app/.gitignore.
+# .env jest w repo celowo — nie ma w nim sekretow (patrz README).
+.DS_Store

@@ -1,0 +1,33 @@
+# Build context to root repozytorium — trzymamy go minimalnym.
+.git
+.gitignore
+README.md
+DEPLOY.md
+
+# Pliki env nie wchodza do obrazu. `app/.env` jawnie, bo builder robi
+# `COPY app/ ./` — wzorce bez prefiksu dopasowuja tylko root kontekstu. Glowny
+# .env jest w repo i bez sekretow, ale i tak nie nalezy do warstwy z kodem:
+# compose podaje go kontenerowi przez `env_file`, nie przez COPY.
+.env
+.env.*
+app/.env
+app/.env.*
+!.env*.example
+
+# Dokumentacja dla agentow — nie ma czego szukac w obrazie.
+CLAUDE.md
+app/AGENTS.md
+app/CLAUDE.md
+app/.claude
+app/.agents
+
+# Artefakty aplikacji — instalowane i budowane na nowo w obrazie.
+app/node_modules
+app/.next
+app/out
+app/coverage
+app/next-env.d.ts
+app/*.tsbuildinfo
+
+# Pliki compose nie sa potrzebne w obrazie.
+docker-compose*.yml

@@ -1,0 +1,142 @@
+# Stack produkcyjny: docker compose -f docker-compose.prod.yml up -d --build
+#
+# Roznice wzgledem dev: obraz budowany do targetu `runner` (standalone), brak
+# bind mountow, brak wystawionego portu — ruch wchodzi wylacznie przez Traefika.
+#
+# RUCH WCHODZACY: podlaczamy sie do Traefika, ktory JUZ dziala na serwerze
+# (kontener `traefik-traefik-1`). Na maszynie z wieloma projektami tylko jeden
+# kontener moze trzymac porty 80 i 443.
+#
+# TAMTEN TRAEFIK STOI W TRYBIE `host` — sprawdzone na serwerze, nie zalozone.
+# Nie nalezy wiec do zadnej sieci bridge: kontenery znajduje przez API Dockera
+# i laczy sie z nimi po ich adresie IP na bridge'u, prosto z hosta. Dziala to
+# niezaleznie od tego, w ktorej sieci bridge stoi aplikacja.
+#
+# MIMO TO dolaczamy sie do `web` i ustawiamy `traefik.docker.network`:
+#   1. tak wdrozona jest wiekszosc pozostalych projektow na tej maszynie,
+#   2. gdyby Traefik kiedys wrocil do sieci bridge, ta konfiguracja nadal
+#      zadziala — odwrotna zmiana wymagalaby edycji pliku pod presja awarii,
+#   3. przy kontenerze w kilku sieciach etykieta `traefik.docker.network`
+#      przestaje byc ozdobnikiem i decyduje, ktory adres IP zostanie uzyty.
+#
+# Siec `web` jest `external: true` — compose jej NIE tworzy. Zaklada ja wdrozenie
+# Traefika. Jesli jej nie ma (profil `own-proxy`), utworz ja raz:
+#   docker network create web
+#
+# Jesli to jedyna aplikacja na serwerze i nie ma tam jeszcze Traefika, uruchom
+# go z tego pliku profilem:  docker compose -f docker-compose.prod.yml --profile own-proxy up -d
+
+name: ${COMPOSE_PROJECT_NAME:-brewcode-favicon}
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+      args:
+        NODE_VERSION: ${NODE_VERSION:-22-bookworm-slim}
+    restart: unless-stopped
+    logging: *logging
+
+    # Chudy proces: Next w trybie standalone serwujacy statyczna strone.
+    # Renderowanie i pakowanie ikon dzieje sie w przegladarce uzytkownika,
+    # nie tutaj. 256 MB wystarcza z zapasem; limit jest po to, zeby wyciek
+    # nie zjadl calego serwera.
+    mem_limit: ${APP_MEM_LIMIT:-256m}
+
+    init: true
+
+    env_file:
+      - .env
+    environment:
+      # Jawnie, bo `env_file` ma pierwszenstwo nad `ENV` z obrazu — bez tego
+      # NODE_ENV=development z .env przeciekloby na produkcje.
+      NODE_ENV: production
+
+    # `proxy` to siec Traefika — bez niej kontener jest dla niego nieosiagalny.
+    networks: [proxy]
+
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.favicon.rule: Host(`${APP_DOMAIN:?APP_DOMAIN jest wymagany — bez niego regula routingu jest pusta i Traefik nie skieruje ruchu}`)
+      # Nazwy entrypointu i resolvera MUSZA zgadzac sie z konfiguracja Traefika
+      # dzialajacego na serwerze — to jego ustawienia, nie nasze. Przy
+      # niezgodnosci router albo nie powstanie, albo nie dostanie certyfikatu.
+      # Sprawdz w jego pliku compose: --entrypoints.<NAZWA>.address=:443
+      # oraz --certificatesresolvers.<NAZWA>.acme...
+      traefik.http.routers.favicon.entrypoints: ${TRAEFIK_ENTRYPOINT:-websecure}
+      # `tls: true` jawnie, mimo ze `tls.certresolver` je implikuje. Bez tego
+      # literowka w nazwie resolvera cicho degraduje router do zwyklego HTTP
+      # zamiast zglosic blad — a wtedy ACME nigdy nie ruszy.
+      traefik.http.routers.favicon.tls: "true"
+      traefik.http.routers.favicon.tls.certresolver: ${TRAEFIK_CERT_RESOLVER:-letsencrypt}
+      traefik.http.routers.favicon.middlewares: favicon-security
+      traefik.http.services.favicon.loadbalancer.server.port: "3240"
+      # Wskazuje Traefikowi, przez ktora siec gadac z kontenerem. Bez tego przy
+      # kontenerze w dwoch sieciach wybiera dowolna i trafia w nieosiagalna.
+      traefik.docker.network: ${TRAEFIK_NETWORK:-web}
+
+      traefik.http.middlewares.favicon-security.headers.stsSeconds: "31536000"
+      traefik.http.middlewares.favicon-security.headers.stsIncludeSubdomains: "true"
+      traefik.http.middlewares.favicon-security.headers.contentTypeNosniff: "true"
+      traefik.http.middlewares.favicon-security.headers.referrerPolicy: strict-origin-when-cross-origin
+      traefik.http.middlewares.favicon-security.headers.frameDeny: "true"
+
+  # Reverse proxy z automatycznym TLS od Let's Encrypt.
+  #
+  # URUCHAMIANY WYLACZNIE PROFILEM `own-proxy`. Domyslnie NIE startuje, bo na
+  # serwerze z wieloma projektami Traefik stoi raz, osobno.
+  #
+  # UWAGA: Traefik ma zamontowany socket Dockera. Jest tylko do odczytu, ale
+  # dostep do niego to i tak faktyczny root na hoscie — dlatego nie wystawiamy
+  # dashboardu i nie dokladamy do tego kontenera niczego innego.
+  traefik:
+    image: traefik:v3.3
+    profiles: ["own-proxy"]
+    restart: unless-stopped
+    logging: *logging
+    networks: [proxy]
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      # Calosc ruchu HTTP przekierowana na HTTPS.
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+      # Bez `:?` celowo. Compose interpoluje CALY plik, takze uslugi wylaczone
+      # profilem, wiec wymog tej zmiennej blokowalby start stacku podlaczonego
+      # do zewnetrznego Traefika.
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      # TLS-ALPN, nie HTTP-01: caly ruch z :80 idzie przekierowaniem na HTTPS,
+      # wiec challenge HTTP-01 kolidowalby z ta regula. TLS-ALPN dziala na :443.
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+      - --api=false
+      - --log.level=INFO
+      - --accesslog=true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/letsencrypt
+
+networks:
+  # Siec Traefika. `external: true` znaczy, ze compose jej NIE tworzy — musi
+  # istniec wczesniej, zalozona przez wdrozenie Traefika. Przy profilu
+  # `own-proxy` utworz ja raz recznie:  docker network create web
+  proxy:
+    external: true
+    name: ${TRAEFIK_NETWORK:-web}
+
+volumes:
+  traefik-certs:

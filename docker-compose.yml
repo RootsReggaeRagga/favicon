@@ -1,0 +1,44 @@
+# Stack developerski. Uruchamiany przez `docker compose up`.
+#
+# Jedna usluga, bo aplikacja nie ma bazy, kolejki ani poczty. Ikony generuje
+# przegladarka, ustawienia mieszkaja w jej localStorage, wiec po stronie
+# serwera nie ma czego utrwalac wolumenem.
+#
+# Nazwa projektu decyduje o nazwach kontenerow, wolumenow i sieci — NIE nazwa
+# katalogu. Dwa katalogi z tym samym plikiem compose to dla Dockera JEDEN
+# projekt, wiec `down` w jednym zabiera kontenery drugiego. Dlatego nazwa jest
+# nadpisywalna: ustaw COMPOSE_PROJECT_NAME w .env, jesli na tej maszynie ma stac
+# wiecej niz jedno wdrozenie tego repozytorium.
+name: ${COMPOSE_PROJECT_NAME:-brewcode-favicon}
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+      args:
+        NODE_VERSION: ${NODE_VERSION:-22-bookworm-slim}
+    restart: unless-stopped
+
+    env_file:
+      - .env
+    environment:
+      # Bind mount przez warstwe VM Dockera nie zawsze przenosi zdarzenia
+      # inotify — bez pollingu hot reload potrafi nie zauwazyc zmiany z hosta.
+      WATCHPACK_POLLING: "true"
+
+    ports:
+      - "${APP_PORT:-3240}:3240"
+
+    volumes:
+      # Kod na bindzie, zeby hot reload widzial zmiany z hosta...
+      - ./app:/srv/app
+      # ...ale node_modules i .next zostaja w kontenerze — inaczej bind
+      # przyslonilby instalacje z obrazu (inna platforma, inne binarki).
+      - app-node-modules:/srv/app/node_modules
+      - app-next-cache:/srv/app/.next
+
+volumes:
+  app-node-modules:
+  app-next-cache:

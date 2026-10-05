@@ -192,20 +192,7 @@ shadcn/ui na Radix, lucide-react, JSZip. Menedżer pakietów: pnpm.
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-Obraz produkcyjny to target `runner`: Next w trybie standalone, proces jako
-użytkownik `node`, limit pamięci 256 MB, healthcheck na
-`http://127.0.0.1:3240/api/health`. Kontener nie wystawia portu — ruch wchodzi
-przez Traefika, który już działa na serwerze. Wymagane w `.env`:
-
-| Zmienna | Domyślnie | Znaczenie |
-| --- | --- | --- |
-| `APP_DOMAIN` | — (wymagana) | domena w regule routingu Traefika, obecnie `favicon.brwcd.dev` |
-| `TRAEFIK_ENTRYPOINT` | `websecure` | entrypoint HTTPS Traefika |
-| `TRAEFIK_CERT_RESOLVER` | `letsencrypt` | resolver certyfikatów |
-| `TRAEFIK_NETWORK` | `web` | sieć Traefika (`external`, musi istnieć) |
-| `COMPOSE_PROJECT_NAME` | `brewcode-favicon` | nazwa projektu compose |
-
-Domena musi mieć rekord DNS wskazujący na serwer. Jeśli na maszynie nie ma
-jeszcze Traefika, można go uruchomić z tego samego pliku profilem `own-proxy`
-(wcześniej `docker network create web`). Build pobiera fonty Geist z Google
-Fonts; w runtime aplikacja nie potrzebuje ruchu wychodzącego.
+Obraz produkcyjny (target `runner`, Next standalone, ok. 40 MB RAM w pracy)
+stoi za Traefikiem działającym na serwerze, pod `APP_DOMAIN` z `.env`. Pełna
+instrukcja — wymagania, konfiguracja, TLS, aktualizacja, rollback, monitoring
+i rozwiązywanie problemów — jest w **[DEPLOY.md](DEPLOY.md)**.

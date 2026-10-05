@@ -12,6 +12,7 @@ import type { IconSource } from "@/lib/source";
  */
 export default function IconCanvas({
   size,
+  height,
   display,
   src,
   settings,
@@ -21,6 +22,8 @@ export default function IconCanvas({
   style,
 }: {
   size: number;
+  /** Wysokosc w px, gdy plotno nie jest kwadratem (ekrany startowe). */
+  height?: number;
   display?: number;
   src: IconSource | null;
   settings: Settings;
@@ -31,16 +34,18 @@ export default function IconCanvas({
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    if (ref.current) paintCanvas(ref.current, size, src, settings, opts);
-  }, [size, src, settings, opts]);
-  const d = display ?? size;
+    if (ref.current) paintCanvas(ref.current, size, src, settings, opts, height ?? size);
+  }, [size, height, src, settings, opts]);
+  // `display` to dluzszy bok w CSS; krotszy wynika z proporcji.
+  const d = display ?? Math.max(size, height ?? size);
+  const k = d / Math.max(size, height ?? size);
   return (
     <canvas
       ref={ref}
       width={size}
-      height={size}
+      height={height ?? size}
       className={className}
-      style={{ width: d, height: d, imageRendering: pixelated ? "pixelated" : "auto", ...style }}
+      style={{ width: size * k, height: (height ?? size) * k, imageRendering: pixelated ? "pixelated" : "auto", ...style }}
     />
   );
 }

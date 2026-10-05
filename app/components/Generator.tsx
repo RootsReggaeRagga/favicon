@@ -3,12 +3,16 @@
 import {
   Crosshair,
   Download,
+  FileDown,
+  FileUp,
   ImageUp,
+  Redo2,
   RotateCcw,
   RotateCw,
   // Lucide 1.x nazywa ikony od osi: pionowa linia = odbicie lewo/prawo.
   TrianglesCenterlineDashedHorizontal as FlipVerticalIcon,
   TrianglesCenterlineDashedVertical as FlipHorizontalIcon,
+  Undo2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -18,15 +22,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { buildPackage, downloadBlob, exportTarget } from "@/lib/package";
+import { buildPackage, downloadBlob, exportTarget, PROJECT_FILE, projectFromJson, projectToJson } from "@/lib/package";
 import type { RenderOptions } from "@/lib/render";
-import { DEFAULT_SETTINGS, GROUPS, type Align, type BgMode, type GroupId, type Settings } from "@/lib/settings";
+import { DEFAULT_SETTINGS, GROUPS, mergeSettings, SMALL_MAX, type Align, type BgMode, type GroupId, type Settings } from "@/lib/settings";
 import {
+  FONTS,
+  hasEmoji,
   SAMPLE_SVG,
   sourceFromDataUrl,
   sourceFromFile,
   sourceFromSvgText,
+  sourceFromText,
+  type FontId,
   type IconSource,
+  type TextSpec,
 } from "@/lib/source";
 import { TARGETS, type Target } from "@/lib/targets";
 import { cn } from "@/lib/utils";
@@ -34,6 +43,7 @@ import { ColorField, Section, Segmented, Slider, Toggle } from "./controls";
 import IconCanvas from "./IconCanvas";
 import Mockups from "./Mockups";
 import TransformOverlay from "./TransformOverlay";
+import { useHistory } from "./useHistory";
 
 const STORAGE_KEY = "brewcode-favicon:v1";
 /** Wiekszego zrodla nie zapisujemy — localStorage ma zwykle ~5 MB na domene. */
@@ -42,8 +52,10 @@ const MAX_STORED_SOURCE = 2_000_000;
 interface Stored {
   settings: Settings;
   groups: GroupId[];
-  source?: { kind: "svg" | "png"; name: string; data: string };
+  source?: { kind: "svg" | "png"; name: string; data: string; text?: TextSpec };
 }
+
+type SourceTab = "file" | "text";
 
 const HERO: RenderOptions = { mode: "shape" };
 const HERO_SIZE = 256;
@@ -103,17 +115,41 @@ function AlignGrid({ x, y, onChange }: { x: Align; y: Align; onChange: (x: Align
   );
 }
 
-function ToolButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+function ToolButton({
+  label,
+  onClick,
+  children,
+  disabled,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+  disabled?: boolean;
+}) {
   return (
-    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title={label} aria-label={label} onClick={onClick}>
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="h-8 w-8"
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+    >
       {children}
     </Button>
   );
 }
 
 function Tile({ target, src, s }: { target: Target; src: IconSource | null; s: Settings }) {
-  const render = Math.min(target.size, 256);
-  const display = Math.max(32, Math.min(target.size, 96));
+  const h = target.height ?? target.size;
+  const long = Math.max(target.size, h);
+  // Podglad renderujemy najwyzej w 256 px na dluzszym boku — dla kafelka 96 px to az nadto.
+  const k = Math.min(1, 256 / long);
+  const render = Math.round(target.size * k);
+  const renderH = Math.round(h * k);
+  const display = Math.max(32, Math.min(long, 96));
   const [busy, setBusy] = useState(false);
   const name = target.path.split("/").pop()!;
   return (
@@ -132,7 +168,7 @@ function Tile({ target, src, s }: { target: Target; src: IconSource | null; s: S
       className="group flex flex-col items-center gap-2 rounded-lg p-2 text-center transition-colors hover:bg-card"
     >
       <div className={cn("relative flex h-[104px] w-[104px] items-center justify-center rounded-md", CHECKER)}>
-        <IconCanvas size={render} display={display} src={src} settings={s} opts={target.opts} pixelated={target.size < display} />
+        <IconCanvas size={render} height={renderH} display={display} src={src} settings={s} opts={target.opts} pixelated={long < display} />
         <Download className="absolute right-1.5 bottom-1.5 h-3.5 w-3.5 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
       </div>
       <span className="text-xs font-medium">{target.label}</span>
@@ -153,8 +189,12 @@ export default function Generator() {
   const [previewBg, setPreviewBg] = useState<PreviewBg>("checker");
   const [selected, setSelected] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [sourceTab, setSourceTab] = useState<SourceTab>("file");
+  const [textSpec, setTextSpec] = useState<TextSpec>({ text: "B", font: "sans", bold: true });
   const fileInput = useRef<HTMLInputElement>(null);
+  const projectInput = useRef<HTMLInputElement>(null);
   const hero = useRef<HTMLDivElement>(null);
+  const history = useHistory(settings, setSettings);
 
   // Siatka kilkudziesieciu canvasow nie musi nadazac za kazdym ruchem suwaka.
   const deferred = useDeferredValue(settings);
@@ -174,42 +214,116 @@ export default function Generator() {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) stored = JSON.parse(raw);
       } catch {}
-      if (stored?.settings) setSettings({ ...DEFAULT_SETTINGS, ...stored.settings });
-      if (stored?.groups) setGroups(new Set(stored.groups));
+      if (stored?.settings) history.reset(mergeSettings(stored.settings));
+      if (stored?.groups) setGroups(new Set(stored.groups.filter((g) => ALL_GROUPS.includes(g))));
       try {
         const s = stored?.source;
-        if (s) setSource(s.kind === "svg" ? await sourceFromSvgText(s.data, s.name) : await sourceFromDataUrl(s.data, s.name));
-        else setSource(await sourceFromSvgText(SAMPLE_SVG, "przykład.svg"));
+        if (s) {
+          const src = s.kind === "svg" ? await sourceFromSvgText(s.data, s.name) : await sourceFromDataUrl(s.data, s.name);
+          if (s.text) {
+            src.text = s.text;
+            setTextSpec(s.text);
+            setSourceTab("text");
+          }
+          setSource(src);
+        } else setSource(await sourceFromSvgText(SAMPLE_SVG, "przykład.svg"));
       } catch {
         setSource(await sourceFromSvgText(SAMPLE_SVG, "przykład.svg"));
       }
       setLoaded(true);
     })();
+    // Tylko przy montazu; `history.reset` jest stabilne.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!loaded) return;
     const data: Stored = { settings, groups: [...groups] };
     if (source && source.data.length < MAX_STORED_SOURCE) {
-      data.source = { kind: source.kind, name: source.name, data: source.data };
+      data.source = { kind: source.kind, name: source.name, data: source.data, text: source.text };
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {}
   }, [settings, groups, source, loaded]);
 
+  const importProject = useCallback(
+    async (file: File) => {
+      const p = await projectFromJson(JSON.parse(await file.text()));
+      history.reset(p.settings);
+      if (p.groups.size) setGroups(p.groups);
+      if (p.source) {
+        setSource(p.source);
+        if (p.source.text) {
+          setTextSpec(p.source.text);
+          setSourceTab("text");
+        } else setSourceTab("file");
+      }
+    },
+    [history],
+  );
+
   const handleFile = useCallback(async (file: File | undefined) => {
     if (!file) return;
     setError(null);
     try {
+      if (file.type === "application/json" || /\.json$/i.test(file.name)) return await importProject(file);
       const src = await sourceFromFile(file);
+      setSourceTab("file");
       setSource(src);
       // Raster zwykle ma juz wlasne kolory — przebarwienie wlaczamy tylko dla SVG.
       setSettings((prev) => ({ ...prev, tint: src.kind === "svg" ? prev.tint : false }));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, []);
+  }, [importProject]);
+
+  // Zrodlo z litery / emoji: generowane od nowa po krotkiej przerwie w pisaniu.
+  const emojiRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!loaded || sourceTab !== "text") return;
+    let cancelled = false;
+    const id = window.setTimeout(async () => {
+      try {
+        const src = await sourceFromText(textSpec);
+        if (cancelled) return;
+        setSource(src);
+        setError(null);
+        // Emoji maja wlasne kolory — przy przejsciu litera ↔ emoji przelaczamy przebarwienie.
+        const emoji = hasEmoji(src.text!.text);
+        if (emojiRef.current !== emoji) {
+          if (emojiRef.current !== null || !source?.text) setSettings((p) => ({ ...p, tint: !emoji }));
+          emojiRef.current = emoji;
+        }
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
+    // `source` celowo poza zaleznosciami — efekt sam go ustawia.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textSpec, sourceTab, loaded]);
+
+  // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y. W polach tekstowych zostawiamy natywne cofanie.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if ((e.target as HTMLElement).closest("input[type=text], textarea, [contenteditable]")) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        history.undo();
+      } else if ((k === "z" && e.shiftKey) || k === "y") {
+        e.preventDefault();
+        history.redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [history]);
 
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
@@ -304,8 +418,32 @@ export default function Generator() {
           </div>
         </header>
 
+        {/* Telefon: pelny podglad jest pod ustawieniami, wiec u gory trzymamy przypiety skrot. */}
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b bg-card/95 px-5 py-2.5 backdrop-blur lg:hidden">
+          <IconCanvas size={128} display={56} src={source} settings={deferred} opts={HERO} />
+          {[16, 32, 48].map((size) => (
+            <IconCanvas key={size} size={size} src={source} settings={deferred} opts={HERO} />
+          ))}
+          <div className="ml-auto flex">
+            <ToolButton label="Cofnij (Ctrl+Z)" disabled={!history.canUndo} onClick={history.undo}>
+              <Undo2 />
+            </ToolButton>
+            <ToolButton label="Ponów (Ctrl+Shift+Z)" disabled={!history.canRedo} onClick={history.redo}>
+              <Redo2 />
+            </ToolButton>
+          </div>
+        </div>
+
         <div className="flex-1 overflow-y-auto">
           <Section title="Ikona źródłowa">
+            <Segmented<SourceTab>
+              value={sourceTab}
+              onChange={setSourceTab}
+              options={[
+                { value: "file", label: "Plik" },
+                { value: "text", label: "Litera / emoji" },
+              ]}
+            />
             <div
               className={cn(
                 "flex items-center gap-3 rounded-lg border-2 border-dashed p-2.5 transition-colors",
@@ -324,17 +462,48 @@ export default function Generator() {
               >
                 {source && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={source.image.src} alt="" className="max-h-10 max-w-10 object-contain" />
+                  <img
+                    src={source.image.src}
+                    alt=""
+                    // Litera jest czarna (kolor nadaje przebarwienie) — na ciemnym tle by zniknela.
+                    className={cn("max-h-10 max-w-10 object-contain", source.text && !hasEmoji(source.text.text) && "invert")}
+                  />
                 )}
               </button>
               <div className="min-w-0 flex-1 text-sm">
                 <div className="truncate font-medium">{source?.name ?? "Brak pliku"}</div>
-                <div className="text-xs text-muted-foreground">Upuść lub wklej (Ctrl+V)</div>
+                <div className="text-xs text-muted-foreground">
+                  {sourceTab === "file" ? "Upuść lub wklej (Ctrl+V)" : "Kolor nadaje przebarwienie"}
+                </div>
               </div>
-              <Button type="button" size="sm" variant="secondary" onClick={() => fileInput.current?.click()}>
-                <ImageUp /> Zmień
-              </Button>
+              {sourceTab === "file" && (
+                <Button type="button" size="sm" variant="secondary" onClick={() => fileInput.current?.click()}>
+                  <ImageUp /> Zmień
+                </Button>
+              )}
             </div>
+            {sourceTab === "text" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="src-text" className="font-normal">
+                    Tekst
+                  </Label>
+                  <Input
+                    id="src-text"
+                    value={textSpec.text}
+                    maxLength={8}
+                    placeholder="np. B, AB albo 🍺"
+                    onChange={(e) => setTextSpec((t) => ({ ...t, text: e.target.value }))}
+                  />
+                </div>
+                <Segmented<FontId>
+                  value={textSpec.font}
+                  onChange={(font) => setTextSpec((t) => ({ ...t, font }))}
+                  options={FONTS.map((f) => ({ value: f.id, label: <span className="text-xs">{f.label}</span> }))}
+                />
+                <Toggle label="Pogrubienie" checked={textSpec.bold} onChange={(bold) => setTextSpec((t) => ({ ...t, bold }))} />
+              </>
+            )}
             <input
               ref={fileInput}
               type="file"
@@ -345,7 +514,7 @@ export default function Generator() {
                 e.target.value = "";
               }}
             />
-            {source && (
+            {source && sourceTab === "file" && (
               <p className="text-xs text-muted-foreground">
                 {source.kind === "svg" ? "Wektor" : "Raster"} · {Math.round(source.width)}×{Math.round(source.height)}
                 {source.kind === "png" && source.width < 512 && (
@@ -448,6 +617,58 @@ export default function Generator() {
             </p>
           </Section>
 
+          <Section title="Cień">
+            <Toggle label="Cień pod ikonką" checked={s.shadow} onChange={(v) => set("shadow", v)} />
+            {s.shadow && (
+              <>
+                <ColorField label="Kolor cienia" value={s.shadowColor} onChange={(v) => set("shadowColor", v)} />
+                <Slider label="Krycie" value={s.shadowOpacity} min={0} max={100} unit="%" onChange={(v) => set("shadowOpacity", v)} />
+                <Slider label="Rozmycie" value={s.shadowBlur} min={0} max={20} step={0.5} unit="%" onChange={(v) => set("shadowBlur", v)} />
+                <Slider label="Przesunięcie w dół" value={s.shadowOffsetY} min={-10} max={10} step={0.5} unit="%" onChange={(v) => set("shadowOffsetY", v)} />
+              </>
+            )}
+          </Section>
+
+          <Section title={`Małe rozmiary (≤ ${SMALL_MAX} px)`}>
+            <Toggle
+              label="Osobna kompozycja"
+              hint="Favicon 16–48 px, favicon.svg i najmniejsze ikony — zwykle większa ikonka, bez ramki"
+              checked={s.smallEnabled}
+              onChange={(v) => set("smallEnabled", v)}
+            />
+            {s.smallEnabled && (
+              <>
+                <Slider label="Rozmiar" value={Math.round(s.smallScale * 100)} min={10} max={150} unit="%" onChange={(v) => set("smallScale", v / 100)} />
+                <Toggle label="Zachowaj obramowanie" checked={s.smallBorder} onChange={(v) => set("smallBorder", v)} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Tryb ciemny (favicon.svg)">
+            <Toggle
+              label="Wariant ciemny"
+              hint="favicon.svg zmienia kolory w motywie ciemnym systemu (prefers-color-scheme)"
+              checked={s.darkEnabled}
+              onChange={(v) => set("darkEnabled", v)}
+            />
+            {s.darkEnabled && (
+              <>
+                <ColorField
+                  label="Tło"
+                  value={s.darkBgColor}
+                  disabled={s.bgMode === "transparent"}
+                  onChange={(v) => set("darkBgColor", v)}
+                />
+                <ColorField label="Ikonka" value={s.darkIconColor} disabled={!s.tint} onChange={(v) => set("darkIconColor", v)} />
+                <p className="text-xs text-muted-foreground">
+                  {s.bgMode === "transparent" ? "Przy braku tła zmienia się tylko kolor ikonki. " : ""}
+                  {!s.tint ? "Kolor ikonki wymaga włączonego przebarwienia. " : ""}
+                  Ten sam kolor ikonki trafia do ciemnej wersji ikony iOS 18.
+                </p>
+              </>
+            )}
+          </Section>
+
           <Section title="Aplikacja">
             <div className="space-y-1.5">
               <Label htmlFor="app-name" className="font-normal">
@@ -492,7 +713,40 @@ export default function Generator() {
             ))}
           </Section>
 
-          <div className="px-5 pb-4">
+          <Section title="Projekt">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="flex-1"
+                onClick={() =>
+                  downloadBlob(
+                    new Blob([JSON.stringify(projectToJson(settings, groups, source), null, 2)], { type: "application/json" }),
+                    PROJECT_FILE,
+                  )
+                }
+              >
+                <FileDown /> Zapisz ustawienia
+              </Button>
+              <Button type="button" size="sm" variant="secondary" className="flex-1" onClick={() => projectInput.current?.click()}>
+                <FileUp /> Wczytaj
+              </Button>
+            </div>
+            <input
+              ref={projectInput}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                handleFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Plik .json z ustawieniami i ikoną źródłową — ten sam trafia do każdej paczki ZIP. Można go też upuścić na
+              okno.
+            </p>
             <button
               type="button"
               className="text-xs text-muted-foreground hover:text-foreground"
@@ -500,10 +754,11 @@ export default function Generator() {
             >
               Przywróć domyślne ustawienia
             </button>
-          </div>
+          </Section>
         </div>
 
-        <div className="border-t p-4">
+        {/* Na telefonie przycisk przyklejony do dolu ekranu; pr-20 robi miejsce na badge. */}
+        <div className="sticky bottom-0 z-10 border-t bg-card p-4 pr-20 lg:static lg:pr-4">
           {error && <p className="mb-2 rounded-md bg-destructive/15 px-3 py-2 text-xs text-destructive">{error}</p>}
           <Button type="button" className="h-10 w-full font-semibold" disabled={!groups.size || !!progress} onClick={download}>
             <Download />
@@ -543,6 +798,13 @@ export default function Generator() {
                   selected ? "opacity-100" : "opacity-60 hover:opacity-100",
                 )}
               >
+                <ToolButton label="Cofnij (Ctrl+Z)" disabled={!history.canUndo} onClick={history.undo}>
+                  <Undo2 />
+                </ToolButton>
+                <ToolButton label="Ponów (Ctrl+Shift+Z)" disabled={!history.canRedo} onClick={history.redo}>
+                  <Redo2 />
+                </ToolButton>
+                <span className="mx-1 h-5 w-px bg-border" />
                 <ToolButton label="Pomniejsz (−)" onClick={() => patch((p) => ({ scale: clamp(+(p.scale - 0.05).toFixed(2), 0.1, 1.5) }))}>
                   <ZoomOut />
                 </ToolButton>

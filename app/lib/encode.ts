@@ -40,7 +40,11 @@ function chunk(type: string, data: Uint8Array): Uint8Array {
  */
 export async function encodeOpaquePng(canvas: HTMLCanvasElement): Promise<Blob> {
   const { width: w, height: h } = canvas;
-  const rgba = canvas.getContext("2d")!.getImageData(0, 0, w, h).data;
+  return encodeRgbPng(canvas.getContext("2d")!.getImageData(0, 0, w, h).data, w, h);
+}
+
+/** Czesc niezalezna od DOM — RGBA w pamieci na PNG RGB. Testowana w encode.test.ts. */
+export async function encodeRgbPng(rgba: Uint8ClampedArray | Uint8Array, w: number, h: number): Promise<Blob> {
   const raw = new Uint8Array(h * (1 + w * 3));
   let o = 0;
   for (let y = 0; y < h; y++) {

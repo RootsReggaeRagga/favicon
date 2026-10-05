@@ -35,10 +35,33 @@ export interface Settings {
   borderWidth: number;
   borderColor: string;
 
+  /** Cien pod ikonka (offset i rozmycie w procentach boku). */
+  shadow: boolean;
+  shadowColor: string;
+  shadowOpacity: number;
+  shadowBlur: number;
+  shadowOffsetY: number;
+
+  /**
+   * Osobna kompozycja dla malych rozmiarow (do SMALL_MAX px): przy 16–48 px
+   * ikonka zwykle musi byc wieksza, a ramka tylko rozmazuje sie w szary piksel.
+   */
+  smallEnabled: boolean;
+  smallScale: number;
+  smallBorder: boolean;
+
+  /** Wariant ciemny favicon.svg (prefers-color-scheme: dark). */
+  darkEnabled: boolean;
+  darkBgColor: string;
+  darkIconColor: string;
+
   appName: string;
   shortName: string;
   themeColor: string;
 }
+
+/** Granica "malych rozmiarow" dla `smallEnabled`, w pikselach. */
+export const SMALL_MAX = 48;
 
 export const DEFAULT_SETTINGS: Settings = {
   scale: 0.6,
@@ -59,6 +82,17 @@ export const DEFAULT_SETTINGS: Settings = {
   radius: 22,
   borderWidth: 0,
   borderColor: "#ffffff",
+  shadow: false,
+  shadowColor: "#000000",
+  shadowOpacity: 35,
+  shadowBlur: 4,
+  shadowOffsetY: 2,
+  smallEnabled: false,
+  smallScale: 0.8,
+  smallBorder: false,
+  darkEnabled: false,
+  darkBgColor: "#1f1f1f",
+  darkIconColor: "#f6b900",
   appName: "Moja aplikacja",
   shortName: "Aplikacja",
   themeColor: "#f59e0b",
@@ -72,15 +106,31 @@ export type GroupId =
   | "ios"
   | "macos"
   | "windows"
+  | "splash"
   | "icons";
 
 export const GROUPS: { id: GroupId; label: string; hint: string }[] = [
   { id: "favicon", label: "Favicon", hint: "favicon.ico, favicon.svg, PNG 16–96" },
-  { id: "apple", label: "Apple touch icon", hint: "180×180, pelne tlo" },
+  { id: "apple", label: "Apple touch icon", hint: "180×180, pełne tło" },
   { id: "pwa", label: "PWA", hint: "192/512, maskable, site.webmanifest" },
-  { id: "android", label: "Android", hint: "mipmap, adaptive icon, Google Play 512" },
-  { id: "ios", label: "iOS / App Store", hint: "AppIcon.appiconset + 1024 App Store" },
+  { id: "android", label: "Android", hint: "mipmap, adaptive icon, powiadomienia, Google Play 512" },
+  { id: "ios", label: "iOS / App Store", hint: "AppIcon klasyczny + iOS 18 (jasny, ciemny, tinted)" },
   { id: "macos", label: "macOS", hint: "AppIcon.appiconset 16–1024" },
   { id: "windows", label: "Windows", hint: "mstile + browserconfig.xml" },
-  { id: "icons", label: "Ikony ogolne", hint: "PNG 16–1024 + SVG" },
+  { id: "splash", label: "Ekrany startowe iOS", hint: "apple-touch-startup-image, 19 urządzeń" },
+  { id: "icons", label: "Ikony ogólne", hint: "PNG 16–1024 + SVG" },
 ];
+
+/** Uzupelnia brakujace pola domyslnymi — zapis ze starszej wersji (albo z pliku JSON) otworzy sie bez bledu. */
+export function mergeSettings(raw: unknown): Settings {
+  const out: Settings = { ...DEFAULT_SETTINGS };
+  if (!raw || typeof raw !== "object") return out;
+  const rec = raw as Record<string, unknown>;
+  for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]) {
+    // Tylko pola znane i tego samego typu — obcy JSON nie wstrzyknie nic dziwnego.
+    if (key in rec && typeof rec[key] === typeof DEFAULT_SETTINGS[key]) {
+      (out as unknown as Record<string, unknown>)[key] = rec[key];
+    }
+  }
+  return out;
+}

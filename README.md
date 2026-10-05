@@ -48,10 +48,17 @@ pnpm dev                        # http://localhost:3000
 
 ### Źródło
 
-- SVG, PNG, JPG lub WebP: kliknięcie przycisku „Zmień”, przeciągnięcie pliku
-  na okno albo wklejenie ze schowka (Ctrl+V).
+- **Plik:** SVG, PNG, JPG lub WebP — kliknięcie przycisku „Zmień”, przeciągnięcie
+  pliku na okno albo wklejenie ze schowka (Ctrl+V).
+- **Litera / emoji:** wpisujesz np. „B”, „AB” albo 🍺, wybierasz krój (Geist,
+  szeryfowy, mono, zaokrąglony) i pogrubienie. Litera jest czarna, kolor nadaje
+  przebarwienie; emoji zachowują swoje barwy (przebarwienie wyłącza się samo).
 - SVG jest normalizowane: brakujące `width`/`height` uzupełniamy z `viewBox`
   (i odwrotnie), bo bez nich część przeglądarek rysuje SVG w canvasie jako nic.
+- SVG jest też **czyszczone**: znikają skrypty, `foreignObject`, handlery `on*`,
+  linki `javascript:` i odwołania do zewnętrznych zasobów (także `@import`
+  i `url()` w stylach). Paczka trafia do cudzych projektów i nie powinna nic
+  takiego przenosić.
 - Przy rastrze mniejszym niż 512 px pojawia się ostrzeżenie, że duże rozmiary
   (512, 1024) będą rozmyte.
 
@@ -63,13 +70,27 @@ pnpm dev                        # http://localhost:3000
 | **Tło** | kolor jednolity, gradient liniowy (dwa kolory + kąt) albo brak tła |
 | **Kolor ikonki** | przebarwienie całej ikonki na jeden kolor (dla SVG domyślnie włączone, dla rastra działa po kanale alfa) |
 | **Kształt** | zaokrąglenie 0–50% (presety: kwadrat, lekki, iOS, koło) oraz grubość i kolor obramowania |
+| **Cień** | cień pod ikonką: kolor, krycie, rozmycie, przesunięcie w dół |
+| **Małe rozmiary (≤ 48 px)** | osobna kompozycja dla favicon 16–48 px, `favicon.svg` i najmniejszych ikon: własny rozmiar ikonki, opcjonalnie bez ramki |
+| **Tryb ciemny** | wariant `favicon.svg` dla `prefers-color-scheme: dark` (tło i kolor ikonki); kolor ikonki trafia też do ciemnej ikony iOS 18 |
 | **Aplikacja** | nazwa, nazwa krótka i theme color — trafiają do `site.webmanifest` i `head.html` |
 | **Paczka** | które grupy plików mają się znaleźć w ZIP-ie |
+| **Projekt** | zapis i wczytanie wszystkich ustawień razem z ikoną źródłową (`brewcode-favicon.json`) |
 
 Każdy suwak ma obok pole, w które można wpisać wartość z palca (przecinek też
 działa, wartość spoza zakresu jest przycinana). Strzałki góra/dół zmieniają ją
 o 1, z Shiftem o 10. Ustawienia, wybrane grupy i plik źródłowy (do 2 MB)
 zostają w przeglądarce po odświeżeniu strony.
+
+**Cofanie:** Ctrl+Z / Ctrl+Shift+Z (albo Ctrl+Y) i przyciski na pasku pod
+podglądem. Zmiany w odstępie krótszym niż 0,4 s łączą się w jeden krok, więc
+przeciągnięcie suwaka albo ikonki to jedno cofnięcie, a nie sto. Historia
+obejmuje ustawienia (nie wymianę pliku źródłowego), do 100 kroków.
+
+**Plik projektu:** `brewcode-favicon.json` zapisuje ustawienia, wybrane grupy
+i ikonę źródłową. Ten sam plik jest w każdej paczce ZIP — żeby poprawić ikony po
+czasie, wystarczy go wczytać („Wczytaj” albo upuszczenie na okno). Nieznane pola
+są pomijane, brakujące uzupełniane domyślnymi.
 
 ### Przekształcenia na podglądzie
 
@@ -90,11 +111,16 @@ przy obróconej ikonce.
 
 - duży podgląd na szachownicy, jasnym lub czarnym tle,
 - rząd rozmiarów 16–128 px w skali 1:1,
-- makiety: karta przeglądarki, ekran domowy iOS, Android adaptive icon (maska
-  koła i squircle), PWA maskable ze strefą bezpieczną,
+- makiety: karta przeglądarki w motywie jasnym i ciemnym, ekran domowy iOS,
+  iOS 18 (jasna / ciemna / tinted), Android adaptive icon (maska koła
+  i squircle), powiadomienie Androida, PWA maskable ze strefą bezpieczną,
 - siatka **wszystkich** generowanych plików pogrupowana platformami — kliknięcie
   kafelka pobiera pojedynczy plik, małe rozmiary są powiększone bez
   wygładzania, żeby było widać każdy piksel.
+
+Na telefonie pełny podgląd jest pod ustawieniami, więc u góry ekranu wisi
+przypięty skrót (ikonka, 16/32/48 px, cofanie), a przycisk pobierania jest
+przyklejony do dołu.
 
 ## Zawartość paczki
 
@@ -106,14 +132,15 @@ pliki aplikacji natywnych — w katalogach platform.
 | **Favicon** | `favicon.ico` (16/32/48 w jednym pliku), `favicon.svg`, `favicon-16x16.png` … `favicon-96x96.png` |
 | **Apple touch icon** | `apple-touch-icon.png` 180×180 |
 | **PWA** | `web-app-manifest-192x192.png`, `-512x512.png` (purpose `any`), wersje `maskable`, `site.webmanifest` |
-| **Android** | `android/res/mipmap-{mdpi…xxxhdpi}/` — `ic_launcher`, `ic_launcher_round`, warstwy adaptive icon `ic_launcher_foreground`, `_background`, `_monochrome`; `mipmap-anydpi-v26/*.xml`; `android/play-store-512.png` |
-| **iOS / App Store** | `ios/AppIcon.appiconset/` — 13 rozmiarów od 20 do 1024 px + `Contents.json` |
+| **Android** | `android/res/mipmap-{mdpi…xxxhdpi}/` — `ic_launcher`, `ic_launcher_round`, warstwy adaptive icon `ic_launcher_foreground`, `_background`, `_monochrome`; `mipmap-anydpi-v26/*.xml`; ikona powiadomień `drawable-{…}/ic_stat_notification.png` (24 dp, biała sylwetka); `android/play-store-512.png` |
+| **iOS / App Store** | `ios-18/AppIcon.appiconset/` — format Xcode 16: 1024 px w wersji jasnej, ciemnej i tinted; `ios/AppIcon.appiconset/` — klasyczny komplet 13 rozmiarów 20–1024 px. Każdy z `Contents.json`, do projektu idzie jeden z nich |
 | **macOS** | `macos/AppIcon.appiconset/` — 16–1024 px + `Contents.json` |
 | **Windows** | `mstile-70x70.png`, `-150x150.png`, `-310x310.png`, `browserconfig.xml` |
+| **Ekrany startowe iOS** | `splash/apple-splash-{w}x{h}.png` — 19 urządzeń (iPhone SE → 16 Pro Max, iPady), orientacja pionowa, tagi `apple-touch-startup-image` w `head.html` |
 | **Ikony ogólne** | `icons/icon-16x16.png` … `icon-1024x1024.png`, `icons/icon.svg` |
-| zawsze | `head.html` (tagi `<link>`/`<meta>` do wklejenia), `README.md` z instrukcją instalacji |
+| zawsze | `head.html` (tagi `<link>`/`<meta>` do wklejenia), `README.md` z instrukcją instalacji, `brewcode-favicon.json` (projekt do ponownego wczytania) |
 
-Pełna paczka to 70 obrazów plus pliki konfiguracyjne.
+Pełna paczka to 97 obrazów plus pliki konfiguracyjne.
 
 ## Jak to działa
 
@@ -127,7 +154,15 @@ jak dana platforma traktuje ustawienia użytkownika:
 | `round` | `ic_launcher_round` | jak `shape`, ale zawsze koło |
 | `fullbleed` | iOS, App Store, apple-touch-icon, Google Play, PWA maskable | pełny kwadrat bez rogów i ramki — maskę nakłada system |
 | `foreground` / `background` | warstwy adaptive icon, kafelki Windows | sama ikonka na przezroczystym tle / samo tło |
-| `monochrome` | `ic_launcher_monochrome` | sylwetka ikonki dla ikon tematycznych Androida 13+ |
+| `monochrome` | `ic_launcher_monochrome`, `ic_stat_notification` | biała sylwetka (ikony tematyczne Androida 13+, powiadomienia) |
+| `dark` | iOS 18 ciemna | ikonka na przezroczystym tle — ciemne tło dokłada system |
+| `tinted` | iOS 18 tinted | ikonka w skali szarości na czerni — kolor nakłada system |
+| `splash` | ekrany startowe iOS | tło na cały ekran (przy „brak tła” — theme color), ikonka na środku |
+
+Cel może też **narzucić ustawienia** (`override`): ikona powiadomień jest zawsze
+wycentrowana i wypełnia obszar 22 z 24 dp, niezależnie od kompozycji. Kompozycja
+małych rozmiarów działa tak samo — renderer podmienia skalę i ramkę, gdy
+rysowany rozmiar nie przekracza 48 px.
 
 **Strefy bezpieczne.** Maskable PWA trzyma treść w kole 80% boku, a adaptive
 icon Androida pokazuje 72 z 108 dp. Renderer dostaje skalę treści (`inset`)
@@ -149,7 +184,10 @@ format obsługiwany przez wszystkie przeglądarki i Windows od Visty.
 źródłowe SVG wchodzi inline jako zagnieżdżony `<svg>` (favicon SVG działa
 w trybie „secure static”, w którym zewnętrzne zasoby i tak by się nie
 załadowały), przebarwienie realizuje filtr `feFlood` + `feComposite`,
-zaokrąglenie — `clipPath`. Wynik zgadza się z wersją PNG co do piksela.
+zaokrąglenie — `clipPath`, cień — `feDropShadow`. Wariant ciemny to blok
+`@media (prefers-color-scheme: dark)` w samym pliku SVG, podmieniający
+wypełnienie tła i kolor przebarwienia. Wynik zgadza się z wersją PNG (różnice
+poniżej 0,1% pikseli, głównie na krawędziach cienia).
 
 ## Struktura
 
@@ -172,6 +210,7 @@ zaokrąglenie — `clipPath`. Wynik zgadza się z wersją PNG co do piksela.
     │   ├── Mockups.tsx        # makiety przeglądarki, iOS, Androida, PWA
     │   ├── IconCanvas.tsx     # canvas renderujacy jeden cel
     │   ├── controls.tsx       # suwak z polem liczbowym, kolor, przełącznik
+    │   ├── useHistory.ts      # cofanie / ponawianie ustawień
     │   ├── BrewcodeBadge.tsx
     │   └── ui/                # komponenty shadcn/ui (Radix)
     └── lib/
@@ -180,11 +219,33 @@ zaokrąglenie — `clipPath`. Wynik zgadza się z wersją PNG co do piksela.
         ├── render.ts          # renderer canvas + składanie SVG
         ├── targets.ts         # katalog wszystkich plików + manifesty
         ├── encode.ts          # PNG RGB, ICO
-        └── package.ts         # eksport pojedynczego pliku i ZIP
+        ├── package.ts         # eksport pojedynczego pliku, ZIP, plik projektu
+        └── *.test.ts          # testy Vitest
 ```
 
 Stos: Next.js 16 (App Router, `output: "standalone"`), React 19, Tailwind 4,
-shadcn/ui na Radix, lucide-react, JSZip. Menedżer pakietów: pnpm.
+shadcn/ui na Radix, lucide-react, JSZip, Vitest. Menedżer pakietów: pnpm.
+
+## Testy
+
+```bash
+cd app
+pnpm test
+```
+
+Vitest sprawdza to, czego pomyłka kończy się odrzuceniem przez platformę albo
+cichym błędem u użytkownika:
+
+- koder PNG RGB (sygnatura, CRC chunków, brak kanału alfa, spłaszczanie
+  półprzezroczystości) i kontener ICO,
+- katalog rozmiarów: unikalne ścieżki, `Contents.json` iOS / iOS 18 / macOS
+  wskazujące istniejące pliki o właściwych wymiarach, kryjące cele App Store,
+  manifest PWA, tagi ekranów startowych w `head.html`,
+- sanityzację SVG, wariant ciemny i cień w `favicon.svg`, kompozycję małych
+  rozmiarów i scalanie ustawień ze starszych zapisów.
+
+Te same testy uruchamia build obrazu Docker (`RUN pnpm test` przed
+`next build`) — czerwony test zatrzymuje wdrożenie.
 
 ## Wdrożenie
 

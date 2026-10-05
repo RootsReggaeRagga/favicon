@@ -105,7 +105,9 @@ z zewnątrz (`next/font` osadza Geist w obrazie przy buildzie), nie ma
 analityki. Działa też za zamkniętym egressem.
 
 **Przy buildzie** kontener `deps` pobiera paczki z registry npm, a `next build`
-fonty z Google Fonts. Bez tego build się nie powiedzie — jeśli serwer nie ma
+fonty z Google Fonts. Przed buildem stage `builder` uruchamia testy
+(`pnpm test`) — jeśli któryś nie przejdzie, obraz nie powstaje, a działający
+kontener zostaje nietknięty. Bez tego build się nie powiedzie — jeśli serwer nie ma
 internetu, zbuduj obraz gdzie indziej i przenieś go `docker save` /
 `docker load`.
 
@@ -304,6 +306,8 @@ Na co patrzeć:
 | Build pada na `fonts.googleapis.com` | brak internetu przy buildzie | §4 — zbuduj gdzie indziej, `docker save`/`load` |
 | Build pada z `Killed` / OOM | za mało RAM na `next build` | dołóż swap albo buduj na innej maszynie |
 | `ERR_PNPM_WORKSPACE_CONFIG_MISMATCH` | brak `pnpm-workspace.yaml` w warstwie `deps` | plik musi być kopiowany razem z manifestami |
+| Build pada na kroku `RUN pnpm test` | któryś test nie przechodzi — zmiana zepsuła paczkę | `cd app && pnpm test` lokalnie, popraw i wypchnij ponownie; stara wersja dalej działa |
+| `"/srv/app/public": not found` | stary Dockerfile sprzed poprawki pustego `public/` | `git pull` — builder sam tworzy ten katalog |
 | Traefik zwraca 404 | kontener poza siecią Traefika albo zła reguła `Host` | §5 „Sieć”, sprawdź `APP_DOMAIN` |
 | Traefik zwraca 502 | zły port w `loadbalancer.server.port` | musi być `3240` |
 | Certyfikat `TRAEFIK DEFAULT CERT` | zła nazwa resolvera | §5 „Nazwy entrypointu i resolvera” |

@@ -94,7 +94,7 @@ export default function ConsentBanner() {
           onClick={openSettings}
           title={t.settings}
           aria-label={t.settings}
-          className="fixed right-[30px] bottom-[84px] z-20 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-2 border-black bg-[#f2f0eb] text-black shadow-lg transition-colors hover:bg-[#f6b900]"
+          className="fixed right-[30px] bottom-[84px] z-20 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-[#f2f0eb] text-black shadow-lg transition-colors hover:bg-[#f6b900]"
         >
           <Cookie className="h-4 w-4" />
         </button>
@@ -215,13 +215,13 @@ function ConsentRow({
         disabled={disabled}
         onClick={() => onChange?.(!checked)}
         className={cn(
-          "relative mt-0.5 h-5 w-9 shrink-0 rounded-full border-2 border-black transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6b900]",
-          disabled ? "cursor-not-allowed bg-[#f6b900]/60" : checked ? "cursor-pointer bg-[#f6b900]" : "cursor-pointer bg-[#a8a49b]",
+          "relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6b900]",
+          disabled ? "cursor-not-allowed bg-[#f6b900]" : checked ? "cursor-pointer bg-[#f6b900]" : "cursor-pointer bg-[#a8a49b]",
         )}
       >
         <span
           className={cn(
-            "absolute top-px left-px h-3.5 w-3.5 rounded-full border border-black bg-white transition-transform duration-200",
+            "absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200",
             checked ? "translate-x-4" : "translate-x-0",
           )}
         />

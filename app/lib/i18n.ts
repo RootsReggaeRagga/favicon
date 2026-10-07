@@ -201,6 +201,21 @@ const pl = {
     maskable: "PWA maskable",
     maskableNote: "przerywane koło = strefa bezpieczna 80%",
   },
+  consent: {
+    title: "Dbamy o Twoją prywatność",
+    description:
+      "Używamy plików cookie Google Analytics, żeby wiedzieć, z czego korzystasz w generatorze. Możesz zaakceptować wszystkie lub dostosować preferencje. Ikony i tak powstają wyłącznie w Twojej przeglądarce.",
+    acceptAll: "Akceptuj wszystkie",
+    rejectAll: "Odrzuć wszystkie",
+    customize: "Dostosuj",
+    settings: "Ustawienia cookies",
+    save: "Zapisz ustawienia",
+    close: "Zamknij bez zmian",
+    necessary: "Niezbędne",
+    necessaryDesc: "Zapamiętanie Twojej decyzji o cookies. Zawsze aktywne.",
+    analytics: "Analityka",
+    analyticsDesc: "Anonimowe dane o ruchu i pobieraniu (Google Analytics). Pomagają nam poprawiać generator.",
+  },
   readme: {
     title: "# Paczka ikon — brewcode-favicon",
     web: [
@@ -406,6 +421,21 @@ const en: Messages = {
     newMessage: "New message",
     maskable: "PWA maskable",
     maskableNote: "dashed circle = 80% safe zone",
+  },
+  consent: {
+    title: "We care about your privacy",
+    description:
+      "We use Google Analytics cookies to learn which parts of the generator you use. You can accept all or customise your preferences. Icons are generated entirely in your browser either way.",
+    acceptAll: "Accept all",
+    rejectAll: "Reject all",
+    customize: "Customise",
+    settings: "Cookie settings",
+    save: "Save settings",
+    close: "Close without changes",
+    necessary: "Necessary",
+    necessaryDesc: "Remembers your cookie choice. Always active.",
+    analytics: "Analytics",
+    analyticsDesc: "Anonymous traffic and download data (Google Analytics). Helps us improve the generator.",
   },
   readme: {
     title: "# Icon package — brewcode-favicon",

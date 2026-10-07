@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { GoogleAnalytics } from "@next/third-parties/google";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { connection } from "next/server";
 import BrewcodeBadge from "@/components/BrewcodeBadge";
+import ConsentBanner from "@/components/ConsentBanner";
+import GoogleTagHead from "@/components/GoogleTagHead";
 import { I18nProvider } from "@/components/I18n";
 import { isGaId } from "@/lib/analytics";
 import { MESSAGES, pickLocale } from "@/lib/i18n";
@@ -44,11 +45,17 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const locale = await requestLocale();
   return (
     <html lang={locale} className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <head>
+        <GoogleTagHead gaId={gaId} />
+      </head>
       <body className="flex min-h-full flex-col font-sans">
-        <I18nProvider locale={locale}>{children}</I18nProvider>
+        <I18nProvider locale={locale}>
+          {children}
+          {/* Bez GA nie ma ciasteczek, wiec nie ma tez o co pytac. */}
+          {isGaId(gaId) && <ConsentBanner />}
+        </I18nProvider>
         <BrewcodeBadge />
       </body>
-      {isGaId(gaId) && <GoogleAnalytics gaId={gaId} />}
     </html>
   );
 }

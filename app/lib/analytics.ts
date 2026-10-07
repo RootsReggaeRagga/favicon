@@ -1,7 +1,11 @@
+import { hasAnalyticsConsent } from "./consent";
+
 /*
- * Zdarzenia Google Analytics 4. Skrypt gtag laduje layout (`@next/third-parties`)
+ * Zdarzenia Google Analytics 4. Skrypt gtag wstawia layout (`GoogleTagHead`)
  * tylko wtedy, gdy w .env jest GA_MEASUREMENT_ID — bez niego `window.gtag` nie
  * istnieje i `track` po cichu nic nie robi (dev, testy, instancje bez GA).
+ * Bez zgody na analityke zdarzenia tez nie ida — nie czekaja nawet w kolejce
+ * dataLayer na ewentualna pozniejsza zgode.
  */
 
 declare global {
@@ -16,7 +20,7 @@ export const isGaId = (id: string | undefined): id is string => !!id && /^G-[A-Z
 export type TrackParams = Record<string, string | number | boolean>;
 
 export function track(event: string, params: TrackParams) {
-  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  if (typeof window === "undefined" || typeof window.gtag !== "function" || !hasAnalyticsConsent()) return;
   try {
     window.gtag("event", event, params);
   } catch {

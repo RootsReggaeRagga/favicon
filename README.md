@@ -227,6 +227,14 @@ poniżej 0,1% pikseli, głównie na krawędziach cienia).
 Stos: Next.js 16 (App Router, `output: "standalone"`), React 19, Tailwind 4,
 shadcn/ui na Radix, lucide-react, JSZip, Vitest. Menedżer pakietów: pnpm.
 
+## Języki
+
+Interfejs jest po polsku dla przeglądarek, które w `Accept-Language` stawiają polski
+wyżej niż angielski, a dla wszystkich pozostałych po angielsku. Język wybiera serwer
+(`pickLocale` w `lib/i18n.ts`), więc nie ma mignięcia przy hydratacji. Teksty obu wersji
+(także README w paczce ZIP) siedzą w słownikach `pl` / `en` w `lib/i18n.ts`;
+test pilnuje, żeby miały te same klucze.
+
 ## Google Analytics
 
 Opcjonalne. Identyfikator strumienia GA4 wpisujesz w `.env`:
@@ -240,7 +248,18 @@ Zmienna jest czytana **w runtime** (layout renderuje się na żądanie przez
 zmianie wystarczy odtworzyć kontener (`docker compose up -d`), bez przebudowy
 obrazu. Wartość musi mieć format `G-…`, inaczej GA się nie włączy.
 
-Skrypt ładuje oficjalny komponent `GoogleAnalytics` z `@next/third-parties`.
+Działa w Google Consent Mode v2 (logika przeniesiona z hopedii, `lib/consent.ts`):
+
+- `components/GoogleTagHead.tsx` wstawia do `<head>` skrypt, który zawsze wysyła
+  `consent default` ze wszystkim `denied`, a gtag.js ładuje **tylko** przy zapisanej
+  zgodzie na analitykę (ciasteczko `brewcode_favicon_consent`, rok, `SameSite=Lax`).
+  Bez zgody nie ma żadnego ruchu do Google — także cookieless pings.
+- `components/ConsentBanner.tsx` przy pierwszej wizycie pokazuje blokujący modal
+  (Akceptuj / Odrzuć / Dostosuj), w kolorach brewcode-landing. Po decyzji ustawienia
+  otwiera przycisk z ciasteczkiem nad znaczkiem brewcode. Bez `GA_MEASUREMENT_ID`
+  baner się nie pokazuje.
+- `track()` nie wysyła zdarzeń bez zgody na analitykę.
+
 Poza odsłonami aplikacja wysyła zdarzenia pobierania (`lib/analytics.ts`):
 
 | Zdarzenie | Kiedy | Parametry |

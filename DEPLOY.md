@@ -220,7 +220,8 @@ etykiety `traefik.http.routers.favicon.middlewares` obok `favicon-security`.
 
 ## 6. Bezpieczeństwo
 
-- Brak bazy, uploadu na serwer, sesji i ciasteczek. Plik wgrany przez
+- Brak bazy, uploadu na serwer i sesji. Jedyne ciasteczko to zapis decyzji
+  o zgodach (`brewcode_favicon_consent`, tylko gdy GA jest włączone). Plik wgrany przez
   użytkownika jest czytany wyłącznie w jego przeglądarce.
 - Jedyna trasa serwerowa to `/api/health` — nie przyjmuje danych.
 - Proces w kontenerze działa jako `node` (uid 1000), nie root.

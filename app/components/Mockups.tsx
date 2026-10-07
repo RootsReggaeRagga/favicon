@@ -5,6 +5,7 @@ import type { RenderOptions } from "@/lib/render";
 import type { Settings } from "@/lib/settings";
 import type { IconSource } from "@/lib/source";
 import { NOTIFICATION } from "@/lib/targets";
+import { useT } from "./I18n";
 import IconCanvas from "./IconCanvas";
 
 const SHAPE: RenderOptions = { mode: "shape" };
@@ -62,7 +63,8 @@ function Tab({ src, s, opts, dark, title }: { src: IconSource | null; s: Setting
 }
 
 export default function Mockups({ src, s }: { src: IconSource | null; s: Settings }) {
-  const name = s.shortName || "Aplikacja";
+  const t = useT();
+  const name = s.shortName || t.mockups.appName;
   // Podglad wariantu ciemnego favicon.svg: te same reguly co w buildSvg —
   // tlo jednolite w kolorze ciemnym (o ile w ogole jest tlo), ikonka w kolorze ciemnym.
   const darkTab = useMemo<RenderOptions>(
@@ -78,12 +80,12 @@ export default function Mockups({ src, s }: { src: IconSource | null; s: Setting
     }),
     [s.darkEnabled, s.bgMode, s.darkBgColor, s.darkIconColor, s.tint, s.iconColor],
   );
-  const title = s.appName || "Moja strona";
+  const title = s.appName || t.mockups.siteTitle;
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <Card
-        title="Karta przeglądarki"
-        note={s.darkEnabled ? "favicon w motywie jasnym i ciemnym (favicon.svg)" : "favicon 16 px (32 px na ekranach HiDPI)"}
+        title={t.mockups.tab}
+        note={s.darkEnabled ? t.mockups.tabNoteDark : t.mockups.tabNote}
       >
         <div className="w-full">
           <Tab src={src} s={s} opts={SHAPE} dark={false} title={title} />
@@ -91,7 +93,7 @@ export default function Mockups({ src, s }: { src: IconSource | null; s: Setting
         </div>
       </Card>
 
-      <Card title="Ekran iOS" note="apple-touch-icon / AppIcon, maska nakładana przez system">
+      <Card title={t.mockups.ios} note={t.mockups.iosNote}>
         <div className="grid w-full grid-cols-3 justify-items-center gap-3 bg-gradient-to-br from-sky-400 via-indigo-500 to-fuchsia-500 px-4 py-5">
           <Placeholder size={52} radius={IOS_RADIUS} color="rgba(255,255,255,.35)" />
           <div className="flex flex-col items-center gap-1">
@@ -102,7 +104,7 @@ export default function Mockups({ src, s }: { src: IconSource | null; s: Setting
         </div>
       </Card>
 
-      <Card title="Android (adaptive)" note="ta sama ikona w masce koła i squircle">
+      <Card title={t.mockups.android} note={t.mockups.androidNote}>
         <div className="flex w-full items-center justify-center gap-5 bg-[#121212] px-4 py-5">
           <div className="flex flex-col items-center gap-1">
             <Adaptive src={src} s={s} size={52} radius="50%" />
@@ -115,7 +117,7 @@ export default function Mockups({ src, s }: { src: IconSource | null; s: Setting
         </div>
       </Card>
 
-      <Card title="iOS 18" note="jasna · ciemna · tinted (kolor wybiera użytkownik)">
+      <Card title={t.mockups.ios18} note={t.mockups.ios18Note}>
         <div className="flex w-full items-center justify-center gap-4 bg-[#0b0b0f] px-4 py-5">
           <IconCanvas size={180} display={52} src={src} settings={s} opts={FULL} style={{ borderRadius: IOS_RADIUS }} />
           {/* Tlo trybu ciemnego dokłada system — tu jego przyblizenie. */}
@@ -129,7 +131,7 @@ export default function Mockups({ src, s }: { src: IconSource | null; s: Setting
         </div>
       </Card>
 
-      <Card title="Powiadomienie Android" note="ic_stat_notification — biała sylwetka">
+      <Card title={t.mockups.notification} note={t.mockups.notificationNote}>
         <div className="w-full bg-[#121212] px-4 py-3">
           <div className="mb-3 flex items-center gap-1.5 text-[10px] text-zinc-300">
             <span>12:30</span>
@@ -141,13 +143,13 @@ export default function Mockups({ src, s }: { src: IconSource | null; s: Setting
             </div>
             <div className="min-w-0 text-[11px] leading-tight">
               <div className="truncate font-medium text-zinc-100">{name}</div>
-              <div className="truncate text-zinc-400">Nowa wiadomość</div>
+              <div className="truncate text-zinc-400">{t.mockups.newMessage}</div>
             </div>
           </div>
         </div>
       </Card>
 
-      <Card title="PWA maskable" note="przerywane koło = strefa bezpieczna 80%">
+      <Card title={t.mockups.maskable} note={t.mockups.maskableNote}>
         <div className="flex w-full items-center justify-center gap-5 bg-[#1a1a1a] px-4 py-5">
           <div className="relative">
             <IconCanvas size={192} display={64} src={src} settings={s} opts={MASKABLE} />

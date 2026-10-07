@@ -5,6 +5,7 @@ import { iconBox } from "@/lib/render";
 import type { Settings } from "@/lib/settings";
 import type { IconSource } from "@/lib/source";
 import { cn } from "@/lib/utils";
+import { useT } from "./I18n";
 
 type Patch = (fn: (prev: Settings) => Partial<Settings>) => void;
 
@@ -44,6 +45,7 @@ export default function TransformOverlay({
   onSelect: () => void;
   patch: Patch;
 }) {
+  const t = useT();
   const root = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const { w, h, cx, cy } = iconBox(src, s, size, 1);
@@ -113,7 +115,7 @@ export default function TransformOverlay({
         <div
           role="button"
           tabIndex={-1}
-          aria-label="Ikonka — przeciągnij, aby przesunąć"
+          aria-label={t.overlay.icon}
           className={cn(
             "pointer-events-auto absolute inset-0 touch-none rounded-sm",
             selected
@@ -135,7 +137,7 @@ export default function TransformOverlay({
             ).map(([pos, cur]) => (
               <span
                 key={pos}
-                aria-label="Skaluj"
+                aria-label={t.overlay.scale}
                 className={cn(corner, pos, cur, "pointer-events-auto touch-none")}
                 onPointerDown={(e) => start(e, "scale")}
                 {...handlers}
@@ -143,8 +145,8 @@ export default function TransformOverlay({
             ))}
             <span className="absolute -top-7 left-1/2 h-5 w-px -translate-x-1/2 bg-primary" />
             <span
-              aria-label="Obróć"
-              title="Obróć (Shift: co 15°)"
+              aria-label={t.overlay.rotate}
+              title={t.overlay.rotateTitle}
               className="pointer-events-auto absolute -top-9 left-1/2 h-4 w-4 -translate-x-1/2 cursor-grab touch-none rounded-full border-2 border-primary bg-background shadow active:cursor-grabbing"
               onPointerDown={(e) => start(e, "rotate")}
               {...handlers}

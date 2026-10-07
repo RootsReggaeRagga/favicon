@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, GROUPS, type GroupId } from "./settings";
 import { SPLASH_SCREENS, TARGETS, textFiles } from "./targets";
 
-const ALL = new Set<GroupId>(GROUPS.map((g) => g.id));
+const ALL = new Set<GroupId>(GROUPS);
 const files = textFiles(ALL, DEFAULT_SETTINGS);
 const file = (path: string) => files.find((f) => f.path === path)!.content;
 const byPath = new Map(TARGETS.map((t) => [t.path, t]));

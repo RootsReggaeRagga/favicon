@@ -1,9 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
 import { connection } from "next/server";
 import BrewcodeBadge from "@/components/BrewcodeBadge";
+import { I18nProvider } from "@/components/I18n";
 import { isGaId } from "@/lib/analytics";
+import { MESSAGES, pickLocale } from "@/lib/i18n";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,11 +19,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Generator ikon — favicon, app icon, PWA",
-  description:
-    "Favicon, ikony aplikacji Android/iOS/macOS, PWA i Windows z jednego pliku SVG lub PNG — lokalnie w przeglądarce.",
-};
+/** Jezyk strony: polski dla przegladarek po polsku, dla reszty angielski. */
+async function requestLocale() {
+  return pickLocale((await headers()).get("accept-language"));
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { meta } = MESSAGES[await requestLocale()];
+  return { title: meta.title, description: meta.description };
+}
 
 export const viewport: Viewport = {
   themeColor: "#1f1f1f",
@@ -34,10 +41,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // przy prerenderze zmienna zostalaby zamrozona w HTML-u z builda.
   await connection();
   const gaId = process.env.GA_MEASUREMENT_ID?.trim();
+  const locale = await requestLocale();
   return (
-    <html lang="pl" className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang={locale} className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
-        {children}
+        <I18nProvider locale={locale}>{children}</I18nProvider>
         <BrewcodeBadge />
       </body>
       {isGaId(gaId) && <GoogleAnalytics gaId={gaId} />}

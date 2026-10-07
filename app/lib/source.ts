@@ -1,3 +1,5 @@
+import { AppError } from "./i18n";
+
 export interface TextSpec {
   text: string;
   font: FontId;
@@ -68,7 +70,7 @@ function normalizeSvg(text: string): { svg: string; width: number; height: numbe
   const doc = new DOMParser().parseFromString(text, "image/svg+xml");
   const root = doc.documentElement;
   if (root.nodeName.toLowerCase() !== "svg" || doc.getElementsByTagName("parsererror").length) {
-    throw new Error("Plik nie jest poprawnym dokumentem SVG.");
+    throw new AppError("notSvg");
   }
   sanitizeSvg(root);
   const num = (v: string | null) => {
@@ -101,7 +103,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     const img = new Image();
     img.decoding = "async";
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Nie udalo sie wczytac obrazu."));
+    img.onerror = () => reject(new AppError("imageLoad"));
     img.src = src;
   });
 }
@@ -131,7 +133,7 @@ export async function sourceFromDataUrl(dataUrl: string, name: string): Promise<
 export async function sourceFromFile(file: File): Promise<IconSource> {
   const isSvg = file.type === "image/svg+xml" || /\.svg$/i.test(file.name);
   if (isSvg) return sourceFromSvgText(await file.text(), file.name);
-  if (!file.type.startsWith("image/")) throw new Error("Obslugiwane formaty: SVG, PNG, JPG, WebP.");
+  if (!file.type.startsWith("image/")) throw new AppError("unsupportedFormat");
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result as string);
@@ -147,12 +149,8 @@ export const SAMPLE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 
 
 export type FontId = "sans" | "serif" | "mono" | "rounded";
 
-export const FONTS: { id: FontId; label: string }[] = [
-  { id: "sans", label: "Geist" },
-  { id: "serif", label: "Szeryfowa" },
-  { id: "mono", label: "Mono" },
-  { id: "rounded", label: "Zaokrąglona" },
-];
+/** Etykiety czcionek sa w slowniku (`source.fonts`). */
+export const FONTS: FontId[] = ["sans", "serif", "mono", "rounded"];
 
 function fontFamily(id: FontId) {
   // Fonty z next/font maja zahaszowane nazwy — bierzemy je z zmiennych CSS na <html>.
@@ -211,7 +209,7 @@ export async function sourceFromText(spec: TextSpec): Promise<IconSource> {
       }
     }
   }
-  if (x1 < 0) throw new Error("Ten znak nie ma kształtu w wybranej czcionce.");
+  if (x1 < 0) throw new AppError("noGlyph");
   const w = x1 - x0 + 1;
   const h = y1 - y0 + 1;
   // Wynik skalujemy tak, by dluzszy bok mial 1024 px.

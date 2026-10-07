@@ -1,3 +1,4 @@
+import type { Localized } from "./i18n";
 import type { RenderOptions } from "./render";
 import type { GroupId, Settings } from "./settings";
 
@@ -13,7 +14,7 @@ export interface Target {
   format: "png" | "ico" | "svg";
   opts: RenderOptions;
   icoSizes?: number[];
-  label: string;
+  label: Localized;
   /** Tylko dla SVG: kompozycja malych rozmiarow (favicon.svg). */
   small?: boolean;
 }
@@ -50,7 +51,7 @@ const MACOS_ICONS: [number, number][] = [
  * Ekrany startowe iOS (apple-touch-startup-image), pionowo: piksele,
  * rozmiar w punktach CSS i gestosc — z tego powstaje zapytanie media.
  */
-export const SPLASH_SCREENS: { w: number; h: number; dw: number; dh: number; ratio: number; device: string }[] = [
+export const SPLASH_SCREENS: { w: number; h: number; dw: number; dh: number; ratio: number; device: Localized }[] = [
   { w: 2048, h: 2732, dw: 1024, dh: 1366, ratio: 2, device: "iPad Pro 12.9″" },
   { w: 1668, h: 2388, dw: 834, dh: 1194, ratio: 2, device: "iPad Pro 11″" },
   { w: 1640, h: 2360, dw: 820, dh: 1180, ratio: 2, device: "iPad Air 10.9″" },
@@ -69,7 +70,7 @@ export const SPLASH_SCREENS: { w: number; h: number; dw: number; dh: number; rat
   { w: 828, h: 1792, dw: 414, dh: 896, ratio: 2, device: "iPhone XR / 11" },
   { w: 1242, h: 2208, dw: 414, dh: 736, ratio: 3, device: "iPhone 8 Plus" },
   { w: 750, h: 1334, dw: 375, dh: 667, ratio: 2, device: "iPhone 8 / SE" },
-  { w: 640, h: 1136, dw: 320, dh: 568, ratio: 2, device: "iPhone SE (1. gen.)" },
+  { w: 640, h: 1136, dw: 320, dh: 568, ratio: 2, device: { pl: "iPhone SE (1. gen.)", en: "iPhone SE (1st gen)" } },
 ];
 const splashFile = (w: number, h: number) => `splash/apple-splash-${w}x${h}.png`;
 
@@ -125,7 +126,7 @@ export function buildTargets(): Target[] {
     }
   }
   for (const [d, k] of ANDROID_DENSITIES) {
-    out.push(t({ group: "android", path: `android/res/drawable-${d}/ic_stat_notification.png`, size: Math.round(24 * k), format: "png", opts: NOTIFICATION, label: `powiadomienie ${d}` }));
+    out.push(t({ group: "android", path: `android/res/drawable-${d}/ic_stat_notification.png`, size: Math.round(24 * k), format: "png", opts: NOTIFICATION, label: { pl: `powiadomienie ${d}`, en: `notification ${d}` } }));
   }
   out.push(t({ group: "android", path: "android/play-store-512.png", size: 512, format: "png", opts: { mode: "fullbleed", opaque: true }, label: "Google Play 512" }));
 
@@ -137,8 +138,8 @@ export function buildTargets(): Target[] {
 
   // iOS 18: jasny (bez alfy, jak App Store), ciemny (przezroczyste tlo — system
   // dokłada wlasne) i tinted (skala szarosci na czerni — system nakłada kolor).
-  out.push(t({ group: "ios", path: `${IOS18_DIR}/AppIcon-1024.png`, size: 1024, format: "png", opts: { mode: "fullbleed", opaque: true }, label: "iOS 18 jasna" }));
-  out.push(t({ group: "ios", path: `${IOS18_DIR}/AppIcon-1024-dark.png`, size: 1024, format: "png", opts: { mode: "dark" }, label: "iOS 18 ciemna" }));
+  out.push(t({ group: "ios", path: `${IOS18_DIR}/AppIcon-1024.png`, size: 1024, format: "png", opts: { mode: "fullbleed", opaque: true }, label: { pl: "iOS 18 jasna", en: "iOS 18 light" } }));
+  out.push(t({ group: "ios", path: `${IOS18_DIR}/AppIcon-1024-dark.png`, size: 1024, format: "png", opts: { mode: "dark" }, label: { pl: "iOS 18 ciemna", en: "iOS 18 dark" } }));
   out.push(t({ group: "ios", path: `${IOS18_DIR}/AppIcon-1024-tinted.png`, size: 1024, format: "png", opts: { mode: "tinted", opaque: true }, label: "iOS 18 tinted" }));
 
   // macOS

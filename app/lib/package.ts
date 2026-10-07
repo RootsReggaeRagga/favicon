@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { AppError, MESSAGES, type Locale } from "./i18n";
 import { canvasToPng, encodeIco, encodeOpaquePng } from "./encode";
 import { buildSvg, renderCanvas } from "./render";
 import { GROUPS, mergeSettings, type GroupId, type Settings } from "./settings";
@@ -20,58 +21,17 @@ export async function exportTarget(target: Target, src: IconSource | null, s: Se
   return target.opts.opaque ? encodeOpaquePng(canvas) : canvasToPng(canvas);
 }
 
-function readme(groups: Set<GroupId>): string {
-  const lines = ["# Paczka ikon — brewcode-favicon", ""];
-  if (groups.has("favicon") || groups.has("apple") || groups.has("pwa") || groups.has("windows") || groups.has("splash")) {
-    lines.push(
-      "## Strona WWW",
-      "Pliki z katalogu glownego paczki skopiuj do katalogu publicznego strony (np. `public/`),",
-      "a zawartosc `head.html` wklej do sekcji `<head>`.",
-      "",
-    );
-  }
-  if (groups.has("android")) {
-    lines.push(
-      "## Android",
-      "Zawartosc `android/res` skopiuj do `app/src/main/res`. `mipmap-anydpi-v26` definiuje adaptive icon",
-      "(tlo, pierwszy plan i warstwe monochromatyczna dla ikon tematycznych Androida 13+).",
-      "`drawable-*/ic_stat_notification.png` to ikona powiadomien (biala sylwetka) — ustaw ja",
-      "w `NotificationCompat.Builder.setSmallIcon(R.drawable.ic_stat_notification)`.",
-      "`android/play-store-512.png` wgraj w Google Play Console.",
-      "",
-    );
-  }
-  if (groups.has("ios")) {
-    lines.push(
-      "## iOS",
-      "Wybierz JEDEN z dwoch katalogow i podmien nim `AppIcon.appiconset` w `Assets.xcassets`:",
-      "",
-      "- `ios-18/AppIcon.appiconset` — format Xcode 16+: jeden rozmiar 1024 w wersji jasnej,",
-      "  ciemnej i tinted (iOS 18). Zalecany dla nowych projektow.",
-      "- `ios/AppIcon.appiconset` — klasyczny komplet 20–1024 px dla starszych wersji Xcode.",
-      "",
-      "Ikony jasne sa bez kanalu alfa, wiec przechodza walidacje App Store Connect.",
-      "",
-    );
-  }
-  if (groups.has("macos")) {
-    lines.push("## macOS", "Katalog `macos/AppIcon.appiconset` podmien w `Assets.xcassets` projektu macOS.", "");
-  }
-  if (groups.has("splash")) {
-    lines.push(
-      "## Ekrany startowe iOS",
-      "Katalog `splash/` skopiuj do katalogu publicznego strony. Tagi `apple-touch-startup-image`",
-      "z `head.html` wybieraja wlasciwy plik po rozmiarze ekranu (orientacja pionowa).",
-      "",
-    );
-  }
-  lines.push(
-    "## Ponowne wygenerowanie",
-    "`brewcode-favicon.json` zawiera wszystkie ustawienia i plik zrodlowy. Wczytaj go w generatorze",
-    "(„Wczytaj ustawienia” albo przeciagnij plik na okno), popraw i pobierz paczke od nowa.",
-    "",
-  );
-  if (groups.has("icons")) lines.push("## Ikony ogolne", "`icons/` — PNG 16–1024 px i wektorowy `icon.svg`.", "");
+function readme(groups: Set<GroupId>, locale: Locale): string {
+  const r = MESSAGES[locale].readme;
+  const lines = [r.title, ""];
+  const section = (text: string[]) => lines.push(...text, "");
+  if (groups.has("favicon") || groups.has("apple") || groups.has("pwa") || groups.has("windows") || groups.has("splash")) section(r.web);
+  if (groups.has("android")) section(r.android);
+  if (groups.has("ios")) section(r.ios);
+  if (groups.has("macos")) section(r.macos);
+  if (groups.has("splash")) section(r.splash);
+  section(r.regenerate);
+  if (groups.has("icons")) section(r.icons);
   return lines.join("\n");
 }
 
@@ -79,6 +39,7 @@ export async function buildPackage(
   groups: Set<GroupId>,
   src: IconSource | null,
   s: Settings,
+  locale: Locale,
   onProgress?: (done: number, total: number) => void,
 ): Promise<Blob> {
   const zip = new JSZip();
@@ -90,7 +51,7 @@ export async function buildPackage(
   }
   for (const f of textFiles(groups, s)) zip.file(f.path, f.content);
   zip.file(PROJECT_FILE, JSON.stringify(projectToJson(s, groups, src), null, 2) + "\n");
-  zip.file("README.md", readme(groups));
+  zip.file("README.md", readme(groups, locale));
   return zip.generateAsync({ type: "blob", compression: "DEFLATE" });
 }
 
@@ -131,18 +92,18 @@ export async function projectFromJson(raw: unknown): Promise<{
   source: IconSource | null;
 }> {
   if (!raw || typeof raw !== "object" || (raw as ProjectJson).format !== PROJECT_FORMAT) {
-    throw new Error("To nie jest plik ustawień generatora ikon.");
+    throw new AppError("notProject");
   }
   const p = raw as Partial<ProjectJson>;
-  const known = new Set<string>(GROUPS.map((g) => g.id));
+  const known = new Set<string>(GROUPS);
   const groups = new Set((Array.isArray(p.groups) ? p.groups : []).filter((g): g is GroupId => known.has(g)));
   let source: IconSource | null = null;
   const s = p.source;
   if (s && typeof s.data === "string") {
     if (s.kind !== "svg" && !/^data:image\/(png|jpe?g|webp|gif);/i.test(s.data)) {
-      throw new Error("Plik ustawień zawiera nieobsługiwany obraz źródłowy.");
+      throw new AppError("badProjectImage");
     }
-    source = s.kind === "svg" ? await sourceFromSvgText(s.data, s.name ?? "ikona.svg") : await sourceFromDataUrl(s.data, s.name ?? "ikona.png");
+    source = s.kind === "svg" ? await sourceFromSvgText(s.data, s.name ?? "icon.svg") : await sourceFromDataUrl(s.data, s.name ?? "icon.png");
     if (s.text) source.text = s.text;
   }
   return { settings: mergeSettings(p.settings), groups, source };

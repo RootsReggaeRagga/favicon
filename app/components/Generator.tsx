@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { track } from "@/lib/analytics";
+import { localize } from "@/lib/i18n";
 import { buildPackage, downloadBlob, exportTarget, PROJECT_FILE, projectFromJson, projectToJson } from "@/lib/package";
 import type { RenderOptions } from "@/lib/render";
 import { DEFAULT_SETTINGS, GROUPS, mergeSettings, SMALL_MAX, type Align, type BgMode, type GroupId, type Settings } from "@/lib/settings";
@@ -41,6 +42,7 @@ import {
 import { TARGETS, type Target } from "@/lib/targets";
 import { cn } from "@/lib/utils";
 import { ColorField, Section, Segmented, Slider, Toggle } from "./controls";
+import { useErrorText, useLocale, useT } from "./I18n";
 import IconCanvas from "./IconCanvas";
 import Mockups from "./Mockups";
 import TransformOverlay from "./TransformOverlay";
@@ -63,14 +65,14 @@ const sourceType = (src: IconSource | null) => (!src ? "none" : src.text ? "text
 
 const HERO: RenderOptions = { mode: "shape" };
 const HERO_SIZE = 256;
-const ALL_GROUPS = GROUPS.map((g) => g.id);
+const ALL_GROUPS = GROUPS;
 
 const RADIUS_PRESETS = [
-  { label: "Kwadrat", value: 0 },
-  { label: "Lekki", value: 12 },
-  { label: "iOS", value: 22 },
-  { label: "Koło", value: 50 },
-];
+  { key: "square", value: 0 },
+  { key: "slight", value: 12 },
+  { key: "ios", value: 22 },
+  { key: "circle", value: 50 },
+] as const;
 
 type PreviewBg = "checker" | "light" | "dark";
 const CHECKER = "bg-[conic-gradient(#2c2c2c_25%,#232323_0_50%,#2c2c2c_0_75%,#232323_0)] bg-[length:20px_20px]";
@@ -81,15 +83,12 @@ const PREVIEW_BG: Record<PreviewBg, string> = {
 };
 
 const ALIGNS: Align[] = ["start", "center", "end"];
-const ALIGN_LABEL = {
-  x: { start: "Lewo", center: "Środek", end: "Prawo" } as Record<Align, string>,
-  y: { start: "Góra", center: "Środek", end: "Dół" } as Record<Align, string>,
-};
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const normDeg = (d: number) => ((((d + 180) % 360) + 360) % 360) - 180;
 
 function AlignGrid({ x, y, onChange }: { x: Align; y: Align; onChange: (x: Align, y: Align) => void }) {
+  const t = useT();
   return (
     <ToggleGroup
       type="single"
@@ -99,7 +98,7 @@ function AlignGrid({ x, y, onChange }: { x: Align; y: Align; onChange: (x: Align
         const [ax, ay] = v.split(":") as [Align, Align];
         onChange(ax, ay);
       }}
-      aria-label="Wyrównanie"
+      aria-label={t.align.label}
       className="grid w-[88px] shrink-0 grid-cols-3 gap-1 p-1"
     >
       {ALIGNS.map((ay) =>
@@ -107,8 +106,8 @@ function AlignGrid({ x, y, onChange }: { x: Align; y: Align; onChange: (x: Align
           <ToggleGroupItem
             key={`${ax}:${ay}`}
             value={`${ax}:${ay}`}
-            title={`${ALIGN_LABEL.x[ax]} · ${ALIGN_LABEL.y[ay]}`}
-            aria-label={`${ALIGN_LABEL.x[ax]} · ${ALIGN_LABEL.y[ay]}`}
+            title={`${t.align.x[ax]} · ${t.align.y[ay]}`}
+            aria-label={`${t.align.x[ax]} · ${t.align.y[ay]}`}
             className="group h-6 px-0 data-[state=on]:bg-primary"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50 group-data-[state=on]:bg-primary-foreground" />
@@ -156,10 +155,12 @@ function Tile({ target, src, s }: { target: Target; src: IconSource | null; s: S
   const display = Math.max(32, Math.min(long, 96));
   const [busy, setBusy] = useState(false);
   const name = target.path.split("/").pop()!;
+  const t = useT();
+  const locale = useLocale();
   return (
     <button
       type="button"
-      title={`Pobierz ${target.path}`}
+      title={t.download.file(target.path)}
       disabled={busy}
       onClick={async () => {
         setBusy(true);
@@ -176,7 +177,7 @@ function Tile({ target, src, s }: { target: Target; src: IconSource | null; s: S
         <IconCanvas size={render} height={renderH} display={display} src={src} settings={s} opts={target.opts} pixelated={long < display} />
         <Download className="absolute right-1.5 bottom-1.5 h-3.5 w-3.5 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
       </div>
-      <span className="text-xs font-medium">{target.label}</span>
+      <span className="text-xs font-medium">{localize(target.label, locale)}</span>
       <span className="max-w-[120px] truncate font-mono text-[10px] text-muted-foreground group-hover:text-primary">
         {busy ? "…" : name}
       </span>
@@ -185,7 +186,12 @@ function Tile({ target, src, s }: { target: Target; src: IconSource | null; s: S
 }
 
 export default function Generator() {
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const t = useT();
+  const locale = useLocale();
+  const errorText = useErrorText();
+  // Domyslne nazwy aplikacji w jezyku interfejsu; reszta ustawien wspolna.
+  const [defaults] = useState<Settings>(() => ({ ...DEFAULT_SETTINGS, appName: t.defaults.appName, shortName: t.defaults.shortName }));
+  const [settings, setSettings] = useState<Settings>(defaults);
   const [source, setSource] = useState<IconSource | null>(null);
   const [groups, setGroups] = useState<Set<GroupId>>(new Set(ALL_GROUPS));
   const [error, setError] = useState<string | null>(null);
@@ -219,7 +225,7 @@ export default function Generator() {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) stored = JSON.parse(raw);
       } catch {}
-      if (stored?.settings) history.reset(mergeSettings(stored.settings));
+      if (stored?.settings) history.reset(mergeSettings(stored.settings, defaults));
       if (stored?.groups) setGroups(new Set(stored.groups.filter((g) => ALL_GROUPS.includes(g))));
       try {
         const s = stored?.source;
@@ -231,9 +237,9 @@ export default function Generator() {
             setSourceTab("text");
           }
           setSource(src);
-        } else setSource(await sourceFromSvgText(SAMPLE_SVG, "przykład.svg"));
+        } else setSource(await sourceFromSvgText(SAMPLE_SVG, t.defaults.sampleName));
       } catch {
-        setSource(await sourceFromSvgText(SAMPLE_SVG, "przykład.svg"));
+        setSource(await sourceFromSvgText(SAMPLE_SVG, t.defaults.sampleName));
       }
       setLoaded(true);
     })();
@@ -279,9 +285,9 @@ export default function Generator() {
       // Raster zwykle ma juz wlasne kolory — przebarwienie wlaczamy tylko dla SVG.
       setSettings((prev) => ({ ...prev, tint: src.kind === "svg" ? prev.tint : false }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
-  }, [importProject]);
+  }, [importProject, errorText]);
 
   // Zrodlo z litery / emoji: generowane od nowa po krotkiej przerwie w pisaniu.
   const emojiRef = useRef<boolean | null>(null);
@@ -301,7 +307,7 @@ export default function Generator() {
           emojiRef.current = emoji;
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setError(errorText(e));
       }
     }, 250);
     return () => {
@@ -369,9 +375,9 @@ export default function Generator() {
   const download = async () => {
     if (!groups.size) return;
     setError(null);
-    setProgress("Generowanie…");
+    setProgress(t.download.generating);
     try {
-      const blob = await buildPackage(groups, source, settings, (done, total) => setProgress(`${done}/${total}`));
+      const blob = await buildPackage(groups, source, settings, locale, (done, total) => setProgress(`${done}/${total}`));
       downloadBlob(blob, "icons.zip");
       track("download_package", {
         file_count: fileCount,
@@ -381,7 +387,7 @@ export default function Generator() {
         size_kb: Math.round(blob.size / 1024),
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setProgress(null);
     }
@@ -401,7 +407,7 @@ export default function Generator() {
   };
 
   const s = settings;
-  const fileCount = TARGETS.filter((t) => groups.has(t.group)).length;
+  const fileCount = TARGETS.filter((x) => groups.has(x.group)).length;
 
   return (
     <div
@@ -425,7 +431,7 @@ export default function Generator() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon.svg" alt="" className="h-9 w-9" />
           <div>
-            <h1 className="text-sm font-semibold">Generator ikon</h1>
+            <h1 className="text-sm font-semibold">{t.header.title}</h1>
             <p className="text-xs text-muted-foreground">favicon · app icon · PWA · Android · iOS</p>
           </div>
         </header>
@@ -437,23 +443,23 @@ export default function Generator() {
             <IconCanvas key={size} size={size} src={source} settings={deferred} opts={HERO} />
           ))}
           <div className="ml-auto flex">
-            <ToolButton label="Cofnij (Ctrl+Z)" disabled={!history.canUndo} onClick={history.undo}>
+            <ToolButton label={t.tools.undo} disabled={!history.canUndo} onClick={history.undo}>
               <Undo2 />
             </ToolButton>
-            <ToolButton label="Ponów (Ctrl+Shift+Z)" disabled={!history.canRedo} onClick={history.redo}>
+            <ToolButton label={t.tools.redo} disabled={!history.canRedo} onClick={history.redo}>
               <Redo2 />
             </ToolButton>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <Section title="Ikona źródłowa">
+          <Section title={t.source.title}>
             <Segmented<SourceTab>
               value={sourceTab}
               onChange={setSourceTab}
               options={[
-                { value: "file", label: "Plik" },
-                { value: "text", label: "Litera / emoji" },
+                { value: "file", label: t.source.tabFile },
+                { value: "text", label: t.source.tabText },
               ]}
             />
             <div
@@ -465,7 +471,7 @@ export default function Generator() {
               <button
                 type="button"
                 onClick={selectIcon}
-                title="Zaznacz ikonkę na podglądzie — pokaże uchwyty przekształceń"
+                title={t.source.selectHint}
                 className={cn(
                   "flex h-12 w-12 shrink-0 items-center justify-center rounded-md ring-offset-2 ring-offset-card transition-shadow",
                   CHECKER,
@@ -483,14 +489,14 @@ export default function Generator() {
                 )}
               </button>
               <div className="min-w-0 flex-1 text-sm">
-                <div className="truncate font-medium">{source?.name ?? "Brak pliku"}</div>
+                <div className="truncate font-medium">{source ? (source.text ? t.source.textName(source.text.text) : source.name) : t.source.noFile}</div>
                 <div className="text-xs text-muted-foreground">
-                  {sourceTab === "file" ? "Upuść lub wklej (Ctrl+V)" : "Kolor nadaje przebarwienie"}
+                  {sourceTab === "file" ? t.source.dropHint : t.source.textHint}
                 </div>
               </div>
               {sourceTab === "file" && (
                 <Button type="button" size="sm" variant="secondary" onClick={() => fileInput.current?.click()}>
-                  <ImageUp /> Zmień
+                  <ImageUp /> {t.source.change}
                 </Button>
               )}
             </div>
@@ -498,22 +504,22 @@ export default function Generator() {
               <>
                 <div className="space-y-1.5">
                   <Label htmlFor="src-text" className="font-normal">
-                    Tekst
+                    {t.source.text}
                   </Label>
                   <Input
                     id="src-text"
                     value={textSpec.text}
                     maxLength={8}
-                    placeholder="np. B, AB albo 🍺"
+                    placeholder={t.source.textPlaceholder}
                     onChange={(e) => setTextSpec((t) => ({ ...t, text: e.target.value }))}
                   />
                 </div>
                 <Segmented<FontId>
                   value={textSpec.font}
                   onChange={(font) => setTextSpec((t) => ({ ...t, font }))}
-                  options={FONTS.map((f) => ({ value: f.id, label: <span className="text-xs">{f.label}</span> }))}
+                  options={FONTS.map((f) => ({ value: f, label: <span className="text-xs">{t.source.fonts[f]}</span> }))}
                 />
-                <Toggle label="Pogrubienie" checked={textSpec.bold} onChange={(bold) => setTextSpec((t) => ({ ...t, bold }))} />
+                <Toggle label={t.source.bold} checked={textSpec.bold} onChange={(bold) => setTextSpec((t) => ({ ...t, bold }))} />
               </>
             )}
             <input
@@ -528,16 +534,16 @@ export default function Generator() {
             />
             {source && sourceTab === "file" && (
               <p className="text-xs text-muted-foreground">
-                {source.kind === "svg" ? "Wektor" : "Raster"} · {Math.round(source.width)}×{Math.round(source.height)}
+                {source.kind === "svg" ? t.source.vector : t.source.raster} · {Math.round(source.width)}×{Math.round(source.height)}
                 {source.kind === "png" && source.width < 512 && (
-                  <span className="text-primary"> · mała rozdzielczość, duże rozmiary będą rozmyte</span>
+                  <span className="text-primary"> · {t.source.lowRes}</span>
                 )}
               </p>
             )}
           </Section>
 
           <Section
-            title="Pozycja"
+            title={t.position.title}
             aside={
               <button
                 type="button"
@@ -546,7 +552,7 @@ export default function Generator() {
                   patch(() => ({ alignX: "center", alignY: "center", offsetX: 0, offsetY: 0, rotation: 0, flipX: false, flipY: false }))
                 }
               >
-                Wyśrodkuj
+                {t.position.center}
               </button>
             }
           >
@@ -554,19 +560,19 @@ export default function Generator() {
               <AlignGrid x={s.alignX} y={s.alignY} onChange={(x, y) => patch(() => ({ alignX: x, alignY: y, offsetX: 0, offsetY: 0 }))} />
               <div className="space-y-1 text-xs text-muted-foreground">
                 <div className="text-sm text-foreground">
-                  {ALIGN_LABEL.x[s.alignX]} · {ALIGN_LABEL.y[s.alignY]}
+                  {t.align.x[s.alignX]} · {t.align.y[s.alignY]}
                 </div>
                 {(s.offsetX !== 0 || s.offsetY !== 0) && (
                   <button type="button" className="text-primary hover:underline" onClick={() => patch(() => ({ offsetX: 0, offsetY: 0 }))}>
-                    Usuń ręczne przesunięcie
+                    {t.position.clearOffset}
                   </button>
                 )}
-                <div>Kliknij ikonkę na podglądzie, by ją przesuwać, skalować i obracać.</div>
+                <div>{t.position.hint}</div>
               </div>
             </div>
-            <Slider label="Rozmiar" value={Math.round(s.scale * 100)} min={10} max={150} unit="%" onChange={(v) => set("scale", v / 100)} />
+            <Slider label={t.position.size} value={Math.round(s.scale * 100)} min={10} max={150} unit="%" onChange={(v) => set("scale", v / 100)} />
             <Slider
-              label="Odstęp od krawędzi"
+              label={t.position.margin}
               value={s.margin}
               min={0}
               max={40}
@@ -575,157 +581,156 @@ export default function Generator() {
               disabled={s.alignX === "center" && s.alignY === "center"}
               onChange={(v) => set("margin", v)}
             />
-            <Slider label="Obrót" value={s.rotation} min={-180} max={180} unit="°" onChange={(v) => set("rotation", v)} />
+            <Slider label={t.position.rotation} value={s.rotation} min={-180} max={180} unit="°" onChange={(v) => set("rotation", v)} />
           </Section>
 
-          <Section title="Tło">
+          <Section title={t.background.title}>
             <Segmented<BgMode>
               value={s.bgMode}
               onChange={(v) => set("bgMode", v)}
               options={[
-                { value: "solid", label: "Kolor" },
-                { value: "gradient", label: "Gradient" },
-                { value: "transparent", label: "Brak" },
+                { value: "solid", label: t.background.solid },
+                { value: "gradient", label: t.background.gradient },
+                { value: "transparent", label: t.background.none },
               ]}
             />
             {s.bgMode !== "transparent" && (
-              <ColorField label={s.bgMode === "gradient" ? "Kolor 1" : "Kolor tła"} value={s.bgColor} onChange={(v) => set("bgColor", v)} />
+              <ColorField label={s.bgMode === "gradient" ? t.background.color1 : t.background.color} value={s.bgColor} onChange={(v) => set("bgColor", v)} />
             )}
             {s.bgMode === "gradient" && (
               <>
-                <ColorField label="Kolor 2" value={s.bgColor2} onChange={(v) => set("bgColor2", v)} />
-                <Slider label="Kąt" value={s.bgAngle} min={0} max={360} unit="°" onChange={(v) => set("bgAngle", v)} />
+                <ColorField label={t.background.color2} value={s.bgColor2} onChange={(v) => set("bgColor2", v)} />
+                <Slider label={t.background.angle} value={s.bgAngle} min={0} max={360} unit="°" onChange={(v) => set("bgAngle", v)} />
               </>
             )}
             {s.bgMode === "transparent" && (
               <p className="text-xs text-muted-foreground">
-                iOS, App Store i Google Play nie przyjmują przezroczystości — tam tło będzie białe.
+                {t.background.transparentNote}
               </p>
             )}
           </Section>
 
-          <Section title="Kolor ikonki">
+          <Section title={t.iconColor.title}>
             <Toggle
-              label="Przebarwij ikonkę"
-              hint={source?.kind === "png" ? "Raster: kolor nakładany na kształt (kanał alfa)" : "Jeden kolor dla całego SVG"}
+              label={t.iconColor.tint}
+              hint={source?.kind === "png" ? t.iconColor.tintRaster : t.iconColor.tintSvg}
               checked={s.tint}
               onChange={(v) => set("tint", v)}
             />
-            <ColorField label="Kolor" value={s.iconColor} disabled={!s.tint} onChange={(v) => set("iconColor", v)} />
+            <ColorField label={t.iconColor.color} value={s.iconColor} disabled={!s.tint} onChange={(v) => set("iconColor", v)} />
           </Section>
 
-          <Section title="Kształt">
-            <Slider label="Zaokrąglenie" value={s.radius} min={0} max={50} step={0.5} unit="%" onChange={(v) => set("radius", v)} />
+          <Section title={t.shape.title}>
+            <Slider label={t.shape.radius} value={s.radius} min={0} max={50} step={0.5} unit="%" onChange={(v) => set("radius", v)} />
             <Segmented<string>
               value={String(s.radius)}
               onChange={(v) => set("radius", Number(v))}
-              options={RADIUS_PRESETS.map((p) => ({ value: String(p.value), label: <span className="text-xs">{p.label}</span> }))}
+              options={RADIUS_PRESETS.map((p) => ({ value: String(p.value), label: <span className="text-xs">{t.shape.presets[p.key]}</span> }))}
             />
-            <Slider label="Obramowanie" value={s.borderWidth} min={0} max={20} step={0.5} unit="%" onChange={(v) => set("borderWidth", v)} />
-            <ColorField label="Kolor obramowania" value={s.borderColor} disabled={s.borderWidth === 0} onChange={(v) => set("borderColor", v)} />
+            <Slider label={t.shape.border} value={s.borderWidth} min={0} max={20} step={0.5} unit="%" onChange={(v) => set("borderWidth", v)} />
+            <ColorField label={t.shape.borderColor} value={s.borderColor} disabled={s.borderWidth === 0} onChange={(v) => set("borderColor", v)} />
             <p className="text-xs text-muted-foreground">
-              Zaokrąglenie i ramka dotyczą favicon, PWA „any”, ikon ogólnych i launchera Androida. iOS, App Store,
-              Google Play i maskable dostają pełny kwadrat — maskę nakłada system.
+              {t.shape.note}
             </p>
           </Section>
 
-          <Section title="Cień">
-            <Toggle label="Cień pod ikonką" checked={s.shadow} onChange={(v) => set("shadow", v)} />
+          <Section title={t.shadow.title}>
+            <Toggle label={t.shadow.toggle} checked={s.shadow} onChange={(v) => set("shadow", v)} />
             {s.shadow && (
               <>
-                <ColorField label="Kolor cienia" value={s.shadowColor} onChange={(v) => set("shadowColor", v)} />
-                <Slider label="Krycie" value={s.shadowOpacity} min={0} max={100} unit="%" onChange={(v) => set("shadowOpacity", v)} />
-                <Slider label="Rozmycie" value={s.shadowBlur} min={0} max={20} step={0.5} unit="%" onChange={(v) => set("shadowBlur", v)} />
-                <Slider label="Przesunięcie w dół" value={s.shadowOffsetY} min={-10} max={10} step={0.5} unit="%" onChange={(v) => set("shadowOffsetY", v)} />
+                <ColorField label={t.shadow.color} value={s.shadowColor} onChange={(v) => set("shadowColor", v)} />
+                <Slider label={t.shadow.opacity} value={s.shadowOpacity} min={0} max={100} unit="%" onChange={(v) => set("shadowOpacity", v)} />
+                <Slider label={t.shadow.blur} value={s.shadowBlur} min={0} max={20} step={0.5} unit="%" onChange={(v) => set("shadowBlur", v)} />
+                <Slider label={t.shadow.offsetY} value={s.shadowOffsetY} min={-10} max={10} step={0.5} unit="%" onChange={(v) => set("shadowOffsetY", v)} />
               </>
             )}
           </Section>
 
-          <Section title={`Małe rozmiary (≤ ${SMALL_MAX} px)`}>
+          <Section title={t.small.title(SMALL_MAX)}>
             <Toggle
-              label="Osobna kompozycja"
-              hint="Favicon 16–48 px, favicon.svg i najmniejsze ikony — zwykle większa ikonka, bez ramki"
+              label={t.small.toggle}
+              hint={t.small.hint}
               checked={s.smallEnabled}
               onChange={(v) => set("smallEnabled", v)}
             />
             {s.smallEnabled && (
               <>
-                <Slider label="Rozmiar" value={Math.round(s.smallScale * 100)} min={10} max={150} unit="%" onChange={(v) => set("smallScale", v / 100)} />
-                <Toggle label="Zachowaj obramowanie" checked={s.smallBorder} onChange={(v) => set("smallBorder", v)} />
+                <Slider label={t.small.size} value={Math.round(s.smallScale * 100)} min={10} max={150} unit="%" onChange={(v) => set("smallScale", v / 100)} />
+                <Toggle label={t.small.keepBorder} checked={s.smallBorder} onChange={(v) => set("smallBorder", v)} />
               </>
             )}
           </Section>
 
-          <Section title="Tryb ciemny (favicon.svg)">
+          <Section title={t.dark.title}>
             <Toggle
-              label="Wariant ciemny"
-              hint="favicon.svg zmienia kolory w motywie ciemnym systemu (prefers-color-scheme)"
+              label={t.dark.toggle}
+              hint={t.dark.hint}
               checked={s.darkEnabled}
               onChange={(v) => set("darkEnabled", v)}
             />
             {s.darkEnabled && (
               <>
                 <ColorField
-                  label="Tło"
+                  label={t.dark.bg}
                   value={s.darkBgColor}
                   disabled={s.bgMode === "transparent"}
                   onChange={(v) => set("darkBgColor", v)}
                 />
-                <ColorField label="Ikonka" value={s.darkIconColor} disabled={!s.tint} onChange={(v) => set("darkIconColor", v)} />
+                <ColorField label={t.dark.icon} value={s.darkIconColor} disabled={!s.tint} onChange={(v) => set("darkIconColor", v)} />
                 <p className="text-xs text-muted-foreground">
-                  {s.bgMode === "transparent" ? "Przy braku tła zmienia się tylko kolor ikonki. " : ""}
-                  {!s.tint ? "Kolor ikonki wymaga włączonego przebarwienia. " : ""}
-                  Ten sam kolor ikonki trafia do ciemnej wersji ikony iOS 18.
+                  {s.bgMode === "transparent" ? t.dark.noBgNote : ""}
+                  {!s.tint ? t.dark.needsTintNote : ""}
+                  {t.dark.iosNote}
                 </p>
               </>
             )}
           </Section>
 
-          <Section title="Aplikacja">
+          <Section title={t.app.title}>
             <div className="space-y-1.5">
               <Label htmlFor="app-name" className="font-normal">
-                Nazwa
+                {t.app.name}
               </Label>
               <Input id="app-name" value={s.appName} onChange={(e) => set("appName", e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="app-short" className="font-normal">
-                Nazwa krótka
+                {t.app.shortName}
               </Label>
               <Input id="app-short" value={s.shortName} onChange={(e) => set("shortName", e.target.value)} />
             </div>
-            <ColorField label="Theme color" value={s.themeColor} onChange={(v) => set("themeColor", v)} />
+            <ColorField label={t.app.themeColor} value={s.themeColor} onChange={(v) => set("themeColor", v)} />
           </Section>
 
           <Section
-            title="Paczka"
+            title={t.pack.title}
             aside={
               <button
                 type="button"
                 className="text-xs text-primary hover:underline"
                 onClick={() => setGroups(groups.size === ALL_GROUPS.length ? new Set() : new Set(ALL_GROUPS))}
               >
-                {groups.size === ALL_GROUPS.length ? "Odznacz" : "Zaznacz"} wszystko
+                {groups.size === ALL_GROUPS.length ? t.pack.deselectAll : t.pack.selectAll}
               </button>
             }
           >
             {GROUPS.map((g) => (
-              <div key={g.id} className="flex items-start gap-2.5">
+              <div key={g} className="flex items-start gap-2.5">
                 <Checkbox
-                  id={`grp-${g.id}`}
-                  checked={groups.has(g.id)}
-                  onCheckedChange={(v) => toggleGroup(g.id, v === true)}
+                  id={`grp-${g}`}
+                  checked={groups.has(g)}
+                  onCheckedChange={(v) => toggleGroup(g, v === true)}
                   className="mt-0.5"
                 />
-                <label htmlFor={`grp-${g.id}`} className="text-sm leading-tight">
-                  {g.label}
-                  <span className="mt-0.5 block text-xs text-muted-foreground">{g.hint}</span>
+                <label htmlFor={`grp-${g}`} className="text-sm leading-tight">
+                  {t.groups[g].label}
+                  <span className="mt-0.5 block text-xs text-muted-foreground">{t.groups[g].hint}</span>
                 </label>
               </div>
             ))}
           </Section>
 
-          <Section title="Projekt">
+          <Section title={t.project.title}>
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -740,10 +745,10 @@ export default function Generator() {
                   track("download_project", { source_type: sourceType(source) });
                 }}
               >
-                <FileDown /> Zapisz ustawienia
+                <FileDown /> {t.project.save}
               </Button>
               <Button type="button" size="sm" variant="secondary" className="flex-1" onClick={() => projectInput.current?.click()}>
-                <FileUp /> Wczytaj
+                <FileUp /> {t.project.load}
               </Button>
             </div>
             <input
@@ -757,15 +762,14 @@ export default function Generator() {
               }}
             />
             <p className="text-xs text-muted-foreground">
-              Plik .json z ustawieniami i ikoną źródłową — ten sam trafia do każdej paczki ZIP. Można go też upuścić na
-              okno.
+              {t.project.note}
             </p>
             <button
               type="button"
               className="text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => setSettings({ ...DEFAULT_SETTINGS, appName: s.appName, shortName: s.shortName })}
+              onClick={() => setSettings({ ...defaults, appName: s.appName, shortName: s.shortName })}
             >
-              Przywróć domyślne ustawienia
+              {t.project.resetDefaults}
             </button>
           </Section>
         </div>
@@ -775,7 +779,7 @@ export default function Generator() {
           {error && <p className="mb-2 rounded-md bg-destructive/15 px-3 py-2 text-xs text-destructive">{error}</p>}
           <Button type="button" className="h-10 w-full font-semibold" disabled={!groups.size || !!progress} onClick={download}>
             <Download />
-            {progress ? `Generowanie ${progress}` : `Pobierz paczkę ZIP (${fileCount} ikon)`}
+            {progress ? t.download.progress(progress) : t.download.button(fileCount)}
           </Button>
         </div>
       </aside>
@@ -811,36 +815,36 @@ export default function Generator() {
                   selected ? "opacity-100" : "opacity-60 hover:opacity-100",
                 )}
               >
-                <ToolButton label="Cofnij (Ctrl+Z)" disabled={!history.canUndo} onClick={history.undo}>
+                <ToolButton label={t.tools.undo} disabled={!history.canUndo} onClick={history.undo}>
                   <Undo2 />
                 </ToolButton>
-                <ToolButton label="Ponów (Ctrl+Shift+Z)" disabled={!history.canRedo} onClick={history.redo}>
+                <ToolButton label={t.tools.redo} disabled={!history.canRedo} onClick={history.redo}>
                   <Redo2 />
                 </ToolButton>
                 <span className="mx-1 h-5 w-px bg-border" />
-                <ToolButton label="Pomniejsz (−)" onClick={() => patch((p) => ({ scale: clamp(+(p.scale - 0.05).toFixed(2), 0.1, 1.5) }))}>
+                <ToolButton label={t.tools.zoomOut} onClick={() => patch((p) => ({ scale: clamp(+(p.scale - 0.05).toFixed(2), 0.1, 1.5) }))}>
                   <ZoomOut />
                 </ToolButton>
                 <span className="w-11 text-center text-xs tabular-nums text-muted-foreground">{Math.round(s.scale * 100)}%</span>
-                <ToolButton label="Powiększ (+)" onClick={() => patch((p) => ({ scale: clamp(+(p.scale + 0.05).toFixed(2), 0.1, 1.5) }))}>
+                <ToolButton label={t.tools.zoomIn} onClick={() => patch((p) => ({ scale: clamp(+(p.scale + 0.05).toFixed(2), 0.1, 1.5) }))}>
                   <ZoomIn />
                 </ToolButton>
                 <span className="mx-1 h-5 w-px bg-border" />
-                <ToolButton label="Obróć w lewo o 90°" onClick={() => patch((p) => ({ rotation: normDeg(p.rotation - 90) }))}>
+                <ToolButton label={t.tools.rotateLeft} onClick={() => patch((p) => ({ rotation: normDeg(p.rotation - 90) }))}>
                   <RotateCcw />
                 </ToolButton>
-                <ToolButton label="Obróć w prawo o 90°" onClick={() => patch((p) => ({ rotation: normDeg(p.rotation + 90) }))}>
+                <ToolButton label={t.tools.rotateRight} onClick={() => patch((p) => ({ rotation: normDeg(p.rotation + 90) }))}>
                   <RotateCw />
                 </ToolButton>
-                <ToolButton label="Odbij w poziomie" onClick={() => patch((p) => ({ flipX: !p.flipX }))}>
+                <ToolButton label={t.tools.flipH} onClick={() => patch((p) => ({ flipX: !p.flipX }))}>
                   <FlipHorizontalIcon className={s.flipX ? "text-primary" : ""} />
                 </ToolButton>
-                <ToolButton label="Odbij w pionie" onClick={() => patch((p) => ({ flipY: !p.flipY }))}>
+                <ToolButton label={t.tools.flipV} onClick={() => patch((p) => ({ flipY: !p.flipY }))}>
                   <FlipVerticalIcon className={s.flipY ? "text-primary" : ""} />
                 </ToolButton>
                 <span className="mx-1 h-5 w-px bg-border" />
                 <ToolButton
-                  label="Resetuj przekształcenia"
+                  label={t.tools.resetTransform}
                   onClick={() =>
                     patch(() => ({
                       scale: DEFAULT_SETTINGS.scale,
@@ -863,19 +867,18 @@ export default function Generator() {
                 onChange={setPreviewBg}
                 className="w-full"
                 options={[
-                  { value: "checker", label: "Szachownica" },
-                  { value: "light", label: "Jasne" },
-                  { value: "dark", label: "Czarne" },
+                  { value: "checker", label: t.preview.checker },
+                  { value: "light", label: t.preview.light },
+                  { value: "dark", label: t.preview.dark },
                 ]}
               />
             </div>
             <div className="min-w-0 flex-1 space-y-3">
-              <h2 className="text-lg font-semibold">Podgląd</h2>
+              <h2 className="text-lg font-semibold">{t.preview.title}</h2>
               <p className="text-sm text-muted-foreground">
-                Kliknij ikonkę, żeby ją zaznaczyć: przeciągnij, by przesunąć, narożniki skalują, uchwyt u góry obraca
-                (Shift — co 15°). Z klawiatury: strzałki, <kbd className="font-mono">+</kbd>/<kbd className="font-mono">−</kbd>,{" "}
-                <kbd className="font-mono">[</kbd>/<kbd className="font-mono">]</kbd>, Esc. Kliknięcie kafelka poniżej pobiera
-                pojedynczy plik.
+                {t.preview.help1}
+                <kbd className="font-mono">+</kbd>/<kbd className="font-mono">−</kbd>, <kbd className="font-mono">[</kbd>/
+                <kbd className="font-mono">]</kbd>, Esc{t.preview.help2}
               </p>
               <div className="flex flex-wrap items-end gap-4 rounded-xl bg-card p-4">
                 {[16, 32, 48, 64, 128].map((size) => (
@@ -891,22 +894,22 @@ export default function Generator() {
           <Mockups src={source} s={deferred} />
 
           {GROUPS.map((g) => {
-            const items = TARGETS.filter((t) => t.group === g.id);
-            const on = groups.has(g.id);
+            const items = TARGETS.filter((x) => x.group === g);
+            const on = groups.has(g);
             return (
-              <section key={g.id} className={on ? "" : "opacity-50"}>
+              <section key={g} className={on ? "" : "opacity-50"}>
                 <div className="mb-2 flex items-baseline justify-between gap-3 border-b pb-2">
                   <h3 className="text-sm font-semibold">
-                    {g.label} <span className="font-normal text-muted-foreground">· {items.length}</span>
+                    {t.groups[g].label} <span className="font-normal text-muted-foreground">· {items.length}</span>
                   </h3>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Checkbox id={`grid-${g.id}`} checked={on} onCheckedChange={(v) => toggleGroup(g.id, v === true)} />
-                    <label htmlFor={`grid-${g.id}`}>w paczce</label>
+                    <Checkbox id={`grid-${g}`} checked={on} onCheckedChange={(v) => toggleGroup(g, v === true)} />
+                    <label htmlFor={`grid-${g}`}>{t.pack.inPackage}</label>
                   </div>
                 </div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(124px,1fr))] gap-1">
-                  {items.map((t) => (
-                    <Tile key={t.id} target={t} src={source} s={deferred} />
+                  {items.map((x) => (
+                    <Tile key={x.id} target={x} src={source} s={deferred} />
                   ))}
                 </div>
               </section>

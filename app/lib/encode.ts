@@ -1,3 +1,5 @@
+import { AppError } from "./i18n";
+
 /* Kodery plikow, ktorych canvas sam nie wyprodukuje. */
 
 let crcTable: Uint32Array | null = null;
@@ -71,7 +73,7 @@ export async function encodeRgbPng(rgba: Uint8ClampedArray | Uint8Array, w: numb
 
 export function canvasToPng(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Nie udalo sie zakodowac PNG."))), "image/png"),
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new AppError("pngEncode"))), "image/png"),
   );
 }
 

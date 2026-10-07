@@ -109,21 +109,12 @@ export type GroupId =
   | "splash"
   | "icons";
 
-export const GROUPS: { id: GroupId; label: string; hint: string }[] = [
-  { id: "favicon", label: "Favicon", hint: "favicon.ico, favicon.svg, PNG 16–96" },
-  { id: "apple", label: "Apple touch icon", hint: "180×180, pełne tło" },
-  { id: "pwa", label: "PWA", hint: "192/512, maskable, site.webmanifest" },
-  { id: "android", label: "Android", hint: "mipmap, adaptive icon, powiadomienia, Google Play 512" },
-  { id: "ios", label: "iOS / App Store", hint: "AppIcon klasyczny + iOS 18 (jasny, ciemny, tinted)" },
-  { id: "macos", label: "macOS", hint: "AppIcon.appiconset 16–1024" },
-  { id: "windows", label: "Windows", hint: "mstile + browserconfig.xml" },
-  { id: "splash", label: "Ekrany startowe iOS", hint: "apple-touch-startup-image, 19 urządzeń" },
-  { id: "icons", label: "Ikony ogólne", hint: "PNG 16–1024 + SVG" },
-];
+/** Kolejnosc grup w interfejsie; etykiety i opisy sa w slowniku (`groups`). */
+export const GROUPS: GroupId[] = ["favicon", "apple", "pwa", "android", "ios", "macos", "windows", "splash", "icons"];
 
 /** Uzupelnia brakujace pola domyslnymi — zapis ze starszej wersji (albo z pliku JSON) otworzy sie bez bledu. */
-export function mergeSettings(raw: unknown): Settings {
-  const out: Settings = { ...DEFAULT_SETTINGS };
+export function mergeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS): Settings {
+  const out: Settings = { ...base };
   if (!raw || typeof raw !== "object") return out;
   const rec = raw as Record<string, unknown>;
   for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]) {

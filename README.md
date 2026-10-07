@@ -255,7 +255,7 @@ Działa w Google Consent Mode v2 (logika przeniesiona z hopedii, `lib/consent.ts
   zgodzie na analitykę (ciasteczko `brewcode_favicon_consent`, rok, `SameSite=Lax`).
   Bez zgody nie ma żadnego ruchu do Google — także cookieless pings.
 - `components/ConsentBanner.tsx` przy pierwszej wizycie pokazuje blokujący modal
-  (Akceptuj / Odrzuć / Dostosuj), w kolorach brewcode-landing. Po decyzji ustawienia
+  (Akceptuj / Odrzuć / Dostosuj), w kolorach brewcode-landing, zaokrąglony jak w brewcode-maping. Po decyzji ustawienia
   otwiera przycisk z ciasteczkiem nad znaczkiem brewcode. Bez `GA_MEASUREMENT_ID`
   baner się nie pokazuje.
 - `track()` nie wysyła zdarzeń bez zgody na analitykę.
